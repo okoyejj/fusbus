@@ -1,0 +1,12 @@
+.env
+.env.production
+.env.local
+.next
+node_modules
+coverage
+playwright-report
+test-results
+public/uploads
+public/investor-receipts
+storage/private
+tsconfig.tsbuildinfo

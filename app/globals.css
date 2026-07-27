@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #fbfbf8;
+  color: #18221d;
+  overflow-x: hidden;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  outline-offset: 3px;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid #f4b400;
+  outline-offset: 3px;
+}
+
+.field {
+  @apply flex flex-col gap-2;
+}
+
+.label {
+  @apply text-sm font-semibold text-ink;
+}
+
+.input {
+  @apply min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-base shadow-sm transition focus:border-forest;
+}
+
+.btn {
+  @apply inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 py-2 text-center text-sm font-semibold transition sm:w-auto;
+}
+
+.btn-primary {
+  @apply bg-forest text-white hover:bg-green-800;
+}
+
+.btn-secondary {
+  @apply border border-forest bg-white text-forest hover:bg-green-50;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold;
+}
