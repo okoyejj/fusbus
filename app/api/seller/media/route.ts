@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import sharp from "sharp";
@@ -22,11 +22,38 @@ function mediaError(request: NextRequest, reason: string, status = 400) {
   return NextResponse.json({ error: reason }, { status });
 }
 
+async function deleteStoredFiles(items: Array<{ fileUrl: string; thumbnailUrl: string | null }>) {
+  const uploadRoot = path.resolve(process.env.UPLOAD_DIR ?? "./public/uploads");
+  await Promise.all(items.flatMap((item) => [item.fileUrl, item.thumbnailUrl].filter(Boolean).map(async (url) => {
+    const relativePath = String(url).replace(/^\/uploads\//, "");
+    const filePath = resolveInside(uploadRoot, relativePath);
+    await unlink(filePath).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") console.error(error);
+    });
+  })));
+}
+
+async function deleteMedia(request: NextRequest, id: string) {
+  const user = await requireUser(UserRole.SELLER);
+  const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
+  const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { id: true, fileUrl: true, thumbnailUrl: true } });
+  if (items.length === 0) return NextResponse.redirect(new URL("/seller/application", request.url), 303);
+  await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
+  await deleteStoredFiles(items);
+  await audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id });
+  return NextResponse.redirect(new URL("/seller/application", request.url), 303);
+}
+
 export async function POST(request: NextRequest) {
   const csrf = requireSameOrigin(request);
   if (csrf) return csrf;
   const user = await requireUser(UserRole.SELLER);
   const form = await request.formData();
+  if (form.get("intent") === "delete") {
+    const id = String(form.get("mediaId") ?? "");
+    if (!id) return mediaError(request, "missing");
+    return deleteMedia(request, id);
+  }
   const files = [...form.getAll("files"), ...form.getAll("file")].filter((item): item is File => item instanceof File && item.size > 0);
   const mediaType = String(form.get("mediaType") ?? "GALLERY") as MediaType;
   if (!Object.values(MediaType).includes(mediaType)) return mediaError(request, "type");
@@ -90,6 +117,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const replaced = mediaType === MediaType.GALLERY
+    ? []
+    : profile.media.filter((item) => item.mediaType === mediaType).map((item) => ({ fileUrl: item.fileUrl, thumbnailUrl: item.thumbnailUrl }));
+
   const uploaded = await prisma.$transaction(async (tx) => {
     if (mediaType !== MediaType.GALLERY) {
       await tx.sellerMedia.deleteMany({ where: { sellerProfileId: profile.id, mediaType } });
@@ -100,6 +131,7 @@ export async function POST(request: NextRequest) {
     }
     return records;
   });
+  if (replaced.length > 0) await deleteStoredFiles(replaced);
   await audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded });
   return NextResponse.redirect(new URL("/seller/application", request.url), 303);
 }
@@ -107,11 +139,13 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const csrf = requireSameOrigin(request);
   if (csrf) return csrf;
-  const user = await requireUser(UserRole.SELLER);
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const user = await requireUser(UserRole.SELLER);
   const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
+  const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { fileUrl: true, thumbnailUrl: true } });
   await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
+  await deleteStoredFiles(items);
   await audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id });
   return NextResponse.json({ ok: true });
 }

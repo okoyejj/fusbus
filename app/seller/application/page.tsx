@@ -31,6 +31,11 @@ function labelText(name: string, label: string) {
   return requiredForSubmit.has(name) ? `${label} *` : label;
 }
 
+function readableSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string }> }) {
   let user;
   try {
@@ -40,7 +45,10 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
   }
   const params = await searchParams;
   const invalidFields = params.fields?.split(",").filter(Boolean) ?? [];
-  const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id }, include: { media: true } });
+  const profile = await prisma.sellerProfile.findUniqueOrThrow({
+    where: { userId: user.id },
+    include: { media: { orderBy: [{ mediaType: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }] } }
+  });
   const mediaErrorMessage =
     params.mediaError === "type"
       ? "Upload JPG, PNG, or WebP images only."
@@ -60,6 +68,11 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
   ] as const;
   const longFields = [
     ["productsOrServices", "Products or services offered"], ["shortSummary", "Short summary"], ["journeyStory", "Detailed entrepreneurial journey"], ["challenges", "Challenges currently faced"], ["achievements", "Achievements so far"], ["communityImpact", "Impact on family or community"], ["futureGoals", "Future ambitions"], ["supportNeeded", "Type of support needed"], ["useOfFunds", "How investment or sponsorship would be used"], ["socialLinks", "Social media links"]
+  ] as const;
+  const mediaSections = [
+    { type: MediaType.PROFILE, title: "Profile picture", empty: "No profile picture uploaded yet." },
+    { type: MediaType.LOGO, title: "Business logo", empty: "No business logo uploaded yet." },
+    { type: MediaType.GALLERY, title: "Product images", empty: "No product images uploaded yet." }
   ] as const;
 
   return (
@@ -139,8 +152,37 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
             <button className="btn btn-primary" type="submit">Upload Product Images</button>
           </form>
         </div>
-        <div className="grid gap-2 text-sm text-stone-700">
-          {profile.media.map((item) => <p key={item.id}>{item.mediaType}: {item.originalFileName} {item.isPublic ? "(public)" : "(private until approved)"}</p>)}
+        <div className="grid gap-5">
+          {mediaSections.map((section) => {
+            const items = profile.media.filter((item) => item.mediaType === section.type);
+            return (
+              <div className="grid gap-3" key={section.type}>
+                <h3 className="font-black">{section.title}</h3>
+                {items.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-stone-300 p-4 text-sm text-stone-600">{section.empty}</p>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {items.map((item) => (
+                      <div className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50" key={item.id}>
+                        <img className="aspect-[4/3] w-full object-cover" src={item.thumbnailUrl ?? item.fileUrl} alt={item.originalFileName} />
+                        <div className="grid gap-3 p-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-stone-900">{item.originalFileName}</p>
+                            <p className="text-xs text-stone-600">{readableSize(item.fileSize)} - {item.isPublic ? "Public" : "Private until approved"}</p>
+                          </div>
+                          <form action="/api/seller/media" method="post">
+                            <input type="hidden" name="intent" value="delete" />
+                            <input type="hidden" name="mediaId" value={item.id} />
+                            <button className="btn btn-secondary w-full" type="submit">Remove</button>
+                          </form>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
