@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type MediaType = "PROFILE" | "LOGO" | "GALLERY";
@@ -43,6 +43,7 @@ function messageForError(error: string) {
     invalid: "One or more images could not be processed.",
     missing: "The image could not be found. Refresh the page and try again.",
     "request-size": "The selected images are too large to upload together. Upload fewer or smaller images.",
+    timeout: "The upload took too long. Your page is still available; please try again.",
     server: "The image request could not be completed. Please try again."
   };
   return messages[error] ?? "The image request could not be completed. Please try again.";
@@ -107,8 +108,7 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
     });
   }
 
-  async function upload(type: MediaType, event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function upload(type: MediaType) {
     const files = selected[type] ?? [];
     if (files.length === 0) {
       setFeedback({ kind: "error", message: "Choose an image before uploading." });
@@ -123,7 +123,10 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
         const body = new FormData();
         body.set("mediaType", type);
         body.set("files", file);
-        const response = await fetch("/api/seller/media", { method: "POST", headers: { Accept: "application/json" }, body });
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 60_000);
+        const response = await fetch("/api/seller/media", { method: "POST", headers: { Accept: "application/json" }, body, signal: controller.signal })
+          .finally(() => window.clearTimeout(timeout));
         const result = await response.json().catch(() => ({})) as { error?: string };
         if (!response.ok) throw new Error(result.error ?? "server");
         completed += 1;
@@ -145,7 +148,8 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
       });
       setSelected((current) => ({ ...current, [type]: files.slice(completed) }));
       if (completed > 0) router.refresh();
-      const detail = messageForError(error instanceof Error ? error.message : "server");
+      const reason = error instanceof DOMException && error.name === "AbortError" ? "timeout" : error instanceof Error ? error.message : "server";
+      const detail = messageForError(reason);
       setFeedback({ kind: "error", message: completed > 0 ? `${completed} image${completed === 1 ? "" : "s"} uploaded. ${detail}` : detail });
     } finally {
       setBusy(null);
@@ -178,7 +182,7 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
         {sections.map((section) => {
           const files = selected[section.type] ?? [];
           return (
-            <form className="grid content-start gap-3" key={section.type} onSubmit={(event) => upload(section.type, event)}>
+            <form className="grid content-start gap-3" key={section.type} onSubmit={(event) => event.preventDefault()}>
               <label className="field">
                 <span className="label">{section.title}</span>
                 <input ref={(element) => { inputRefs.current[section.type] = element; }} className="input" type="file" accept="image/jpeg,image/png,image/webp" multiple={section.multiple} onChange={(event) => chooseFiles(section.type, event)} disabled={busy !== null} />
@@ -190,7 +194,7 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
                   <p className="truncate px-2 py-1 text-xs">{item.file.name}</p>
                 </div>)}
               </div>}
-              <button className="btn btn-primary" type="submit" disabled={busy !== null || files.length === 0}>{busy === section.type ? `Uploading ${Math.min(uploadProgress + 1, files.length)} of ${files.length}...` : `Upload ${section.title}`}</button>
+              <button className="btn btn-primary" type="button" onClick={() => upload(section.type)} disabled={busy !== null || files.length === 0}>{busy === section.type ? `Uploading ${Math.min(uploadProgress + 1, files.length)} of ${files.length}...` : `Upload ${section.title}`}</button>
             </form>
           );
         })}
