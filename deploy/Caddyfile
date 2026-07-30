@@ -1,4 +1,14 @@
 {$CADDY_SITE_ADDRESS} {
   encode gzip zstd
-  reverse_proxy app:3000
+
+  handle_path /uploads/* {
+    root * /srv/uploads
+    header Cache-Control "public, max-age=31536000, immutable"
+    header X-Content-Type-Options "nosniff"
+    file_server
+  }
+
+  handle {
+    reverse_proxy app:3000
+  }
 }
