@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { MediaType, UserRole } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { businessStages } from "@/lib/validation";
+import { businessCategories, businessStages } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +56,7 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
                 ? "The image upload could not be completed."
                 : null;
   const fields = [
-    ["fullName", "Full name"], ["businessName", "Business or trading name"], ["phoneNumber", "Phone number"], ["whatsappNumber", "WhatsApp number"], ["city", "Town or city"], ["region", "Region"], ["category", "Business category"], ["websiteUrl", "Website link"]
+    ["fullName", "Full name"], ["businessName", "Business or trading name"], ["phoneNumber", "Phone number"], ["whatsappNumber", "WhatsApp number"], ["city", "Town or city"], ["region", "Region"], ["websiteUrl", "Website link"]
   ] as const;
   const longFields = [
     ["productsOrServices", "Products or services offered"], ["shortSummary", "Short summary"], ["journeyStory", "Detailed entrepreneurial journey"], ["challenges", "Challenges currently faced"], ["achievements", "Achievements so far"], ["communityImpact", "Impact on family or community"], ["futureGoals", "Future ambitions"], ["supportNeeded", "Type of support needed"], ["useOfFunds", "How investment or sponsorship would be used"], ["socialLinks", "Social media links"]
@@ -85,6 +85,14 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
               {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
             </label>
           ))}
+          <label className="field">
+            <span className="label">Business category *</span>
+            <select className="input" name="category" defaultValue={value(profile.category)}>
+              <option value="">Select a business category</option>
+              {businessCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            {invalidFields.includes("category") && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
+          </label>
           <label className="field">
             <span className="label">Current business stage *</span>
             <select className="input" name="businessStage" defaultValue={value(profile.businessStage)}>

@@ -2,6 +2,7 @@ import { ApplicationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { publicSellerSelect } from "@/lib/public-select";
 import { SellerCard } from "@/components/SellerCard";
+import { businessCategories } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,10 @@ export default async function SellersPage({ searchParams }: { searchParams: Prom
       <h1 className="text-4xl font-black">Meet Our Entrepreneurs</h1>
       <form className="mt-8 grid gap-3 rounded-lg border border-stone-200 bg-white p-4 md:grid-cols-5">
         <input className="input md:col-span-2" name="q" placeholder="Search name, reference, product" defaultValue={filters.q} />
-        <input className="input" name="category" placeholder="Category" defaultValue={filters.category} />
+        <select className="input" name="category" defaultValue={filters.category ?? ""} aria-label="Category">
+          <option value="">All categories</option>
+          {businessCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+        </select>
         <input className="input" name="location" placeholder="Location" defaultValue={filters.location} />
         <button className="btn btn-primary" type="submit">Search</button>
       </form>

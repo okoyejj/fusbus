@@ -16,7 +16,26 @@ export const businessStages = [
   "Export-ready"
 ] as const;
 
+export const businessCategories = [
+  "Agriculture",
+  "Beauty and Wellness",
+  "Creative Goods",
+  "Digital Services",
+  "Education and Training",
+  "Fashion and Textiles",
+  "Food Processing",
+  "Health and Care",
+  "Hospitality and Tourism",
+  "Manufacturing",
+  "Other",
+  "Professional Services",
+  "Retail and Trade",
+  "Technology",
+  "Transport and Logistics"
+] as const;
+
 const optionalBusinessStage = z.preprocess(blankToNull, z.enum(businessStages).nullable().optional());
+const optionalBusinessCategory = z.preprocess(blankToNull, z.enum(businessCategories).nullable().optional());
 
 export const passwordSchema = z
   .string()
@@ -44,7 +63,7 @@ export const sellerProfileSchema = z.object({
   whatsappNumber: optionalText(40),
   city: optionalText(80),
   region: optionalText(80),
-  category: optionalText(80),
+  category: optionalBusinessCategory,
   productsOrServices: optionalText(2000),
   yearsInBusiness: optionalNumber(100),
   employeeCount: optionalNumber(100000),
@@ -67,7 +86,7 @@ export const sellerProfileSchema = z.object({
 export const submitSellerSchema = sellerProfileSchema.extend({
   city: z.string().min(2).max(80),
   region: z.string().min(2).max(80),
-  category: z.string().min(2).max(80),
+  category: z.enum(businessCategories),
   productsOrServices: z.string().min(2).max(2000),
   businessStage: z.enum(businessStages),
   supportNeeded: z.string().min(2).max(500),
