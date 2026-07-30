@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ApplicationStatus, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { sellerProfileSchema, submitSellerSchema } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 import { queueNotification } from "@/lib/notifications";
 import { requireSameOrigin } from "@/lib/security";
+import { sellerProfileUpsertArgs } from "@/lib/seller-application";
 
 function validationRedirect(request: NextRequest, fields: string[]) {
   const url = new URL("/seller/application", request.url);
@@ -38,28 +39,13 @@ export async function POST(request: NextRequest) {
       consentPublish: body.consentPublish === "on" || body.consentPublish === "true"
     });
     if (draftParsed.success) {
-      await prisma.sellerProfile.update({
-        where: { userId: user.id },
-        data: {
-          ...draftParsed.data,
-          websiteUrl: draftParsed.data.websiteUrl || null,
-          socialLinks: draftParsed.data.socialLinks ? { raw: draftParsed.data.socialLinks } : undefined
-        }
-      });
+      const oldDraft = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
+      await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, draftParsed.data, false, oldDraft?.applicationStatus, oldDraft?.submittedAt));
     }
     return validationRedirect(request, Object.keys(parsed.error.flatten().fieldErrors));
   }
-  const oldProfile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
-  const profile = await prisma.sellerProfile.update({
-    where: { userId: user.id },
-    data: {
-      ...parsed.data,
-      websiteUrl: parsed.data.websiteUrl || null,
-      socialLinks: parsed.data.socialLinks ? { raw: parsed.data.socialLinks } : undefined,
-      applicationStatus: submit ? ApplicationStatus.SUBMITTED : oldProfile.applicationStatus,
-      submittedAt: submit ? new Date() : oldProfile.submittedAt
-    }
-  });
+  const oldProfile = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
+  const profile = await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, parsed.data, submit, oldProfile?.applicationStatus, oldProfile?.submittedAt));
   await audit(request, { actorUserId: user.id, action: submit ? "SELLER_SUBMITTED" : "SELLER_DRAFT_SAVED", entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile });
   if (submit) {
     await queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." });
