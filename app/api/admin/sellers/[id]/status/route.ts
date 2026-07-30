@@ -6,11 +6,7 @@ import { adminStatusSchema } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 import { queueNotification } from "@/lib/notifications";
 import { requireSameOrigin } from "@/lib/security";
-
-function referenceId() {
-  const year = new Date().getFullYear();
-  return `CMR-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
-}
+import { adminStatusUpdateData, publicMediaUpdateForStatus, statusNotificationMessage } from "@/lib/admin-status";
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const csrf = requireSameOrigin(request);
@@ -22,26 +18,39 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   if (parsed.data.status === "REJECTED" && !parsed.data.reason) {
     return NextResponse.json({ error: "Rejection requires an internal reason" }, { status: 400 });
   }
-  const oldProfile = await prisma.sellerProfile.findUniqueOrThrow({ where: { id: params.id } });
-  const approved = parsed.data.status === "APPROVED";
-  const profile = await prisma.sellerProfile.update({
-    where: { id: params.id },
-    data: {
-      applicationStatus: parsed.data.status as ApplicationStatus,
-      isFeatured: parsed.data.isFeatured ?? oldProfile.isFeatured,
-      sellerReferenceId: approved ? oldProfile.sellerReferenceId ?? referenceId() : oldProfile.sellerReferenceId,
-      approvedAt: approved ? new Date() : oldProfile.approvedAt,
-      approvedBy: approved ? admin.id : oldProfile.approvedBy,
-      rejectionReason: parsed.data.status === "REJECTED" ? parsed.data.reason : oldProfile.rejectionReason,
-      sellerFacingMessage: parsed.data.sellerFacingMessage
-    }
-  });
-  await audit(request, { actorUserId: admin.id, action: `ADMIN_STATUS_${parsed.data.status}`, entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile });
-  await queueNotification({
-    userId: profile.userId,
-    type: `SELLER_${parsed.data.status}`,
-    subject: `Application ${parsed.data.status.toLowerCase().replaceAll("_", " ")}`,
-    message: parsed.data.sellerFacingMessage ?? `Your application status is now ${parsed.data.status}.`
-  });
-  return NextResponse.json({ profile });
+  const oldProfile = await prisma.sellerProfile.findUnique({ where: { id: params.id } });
+  if (!oldProfile) return NextResponse.json({ error: "Seller application not found" }, { status: 404 });
+
+  try {
+    const profile = await prisma.$transaction(async (tx) => {
+      const updated = await tx.sellerProfile.update({
+        where: { id: params.id },
+        data: adminStatusUpdateData({
+          status: parsed.data.status as ApplicationStatus,
+          isFeatured: parsed.data.isFeatured,
+          reason: parsed.data.reason,
+          sellerFacingMessage: parsed.data.sellerFacingMessage,
+          oldProfile,
+          adminId: admin.id
+        })
+      });
+      await tx.sellerMedia.updateMany({
+        where: { sellerProfileId: updated.id },
+        data: publicMediaUpdateForStatus(updated.applicationStatus)
+      });
+      return updated;
+    });
+
+    audit(request, { actorUserId: admin.id, action: `ADMIN_STATUS_${parsed.data.status}`, entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile }).catch(console.error);
+    queueNotification({
+      userId: profile.userId,
+      type: `SELLER_${parsed.data.status}`,
+      subject: `Application ${parsed.data.status.toLowerCase().replaceAll("_", " ")}`,
+      message: statusNotificationMessage(parsed.data.status as ApplicationStatus, parsed.data.sellerFacingMessage)
+    }).catch(console.error);
+    return NextResponse.json({ profile });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Could not update seller application status" }, { status: 500 });
+  }
 }

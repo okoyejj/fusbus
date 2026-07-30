@@ -6,6 +6,18 @@ const optionalNumber = (max: number) => z.preprocess(blankToNull, z.coerce.numbe
 const optionalMoney = z.preprocess(blankToNull, z.coerce.number().nonnegative().nullable().optional());
 const optionalUrl = z.preprocess(blankToNull, z.string().trim().url().nullable().optional());
 
+export const businessStages = [
+  "Idea or concept",
+  "Startup",
+  "Early stage",
+  "Growing",
+  "Established",
+  "Scaling",
+  "Export-ready"
+] as const;
+
+const optionalBusinessStage = z.preprocess(blankToNull, z.enum(businessStages).nullable().optional());
+
 export const passwordSchema = z
   .string()
   .min(10)
@@ -36,7 +48,7 @@ export const sellerProfileSchema = z.object({
   productsOrServices: optionalText(2000),
   yearsInBusiness: optionalNumber(100),
   employeeCount: optionalNumber(100000),
-  businessStage: optionalText(80),
+  businessStage: optionalBusinessStage,
   websiteUrl: optionalUrl,
   socialLinks: optionalText(1000),
   shortSummary: optionalText(300),
@@ -57,7 +69,7 @@ export const submitSellerSchema = sellerProfileSchema.extend({
   region: z.string().min(2).max(80),
   category: z.string().min(2).max(80),
   productsOrServices: z.string().min(10).max(2000),
-  businessStage: z.string().min(2).max(80),
+  businessStage: z.enum(businessStages),
   shortSummary: z.string().min(20).max(300),
   journeyStory: z.string().min(80).max(6000),
   challenges: z.string().min(10).max(2000),
