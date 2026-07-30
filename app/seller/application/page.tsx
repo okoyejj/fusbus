@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessCategories, businessStages } from "@/lib/validation";
 import { FeedbackModal } from "@/components/FeedbackModal";
-import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +63,10 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
               ? "One or more images could not be processed."
               : params.mediaError === "missing"
                 ? "Choose an image before uploading."
+                : params.mediaError === "request-size"
+                  ? "The selected images are too large to upload together. Upload fewer or smaller images."
+                  : params.mediaError === "server"
+                    ? "The image upload could not be completed. Please try one image at a time."
               : params.mediaError
                 ? "The image upload could not be completed."
                 : null;
@@ -153,17 +156,17 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
             <input type="hidden" name="mediaType" value={MediaType.PROFILE} />
             <label className="field"><span className="label">Profile picture</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <PendingSubmitButton pendingLabel="Uploading...">Upload Profile Picture</PendingSubmitButton>
+            <button className="btn btn-primary" type="submit">Upload Profile Picture</button>
           </form>
           <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
             <input type="hidden" name="mediaType" value={MediaType.LOGO} />
             <label className="field"><span className="label">Business logo</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <PendingSubmitButton pendingLabel="Uploading...">Upload Business Logo</PendingSubmitButton>
+            <button className="btn btn-primary" type="submit">Upload Business Logo</button>
           </form>
           <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
             <input type="hidden" name="mediaType" value={MediaType.GALLERY} />
             <label className="field"><span className="label">Product images</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple required /></label>
-            <PendingSubmitButton pendingLabel="Uploading...">Upload Product Images</PendingSubmitButton>
+            <button className="btn btn-primary" type="submit">Upload Product Images</button>
           </form>
         </div>
         <div className="grid gap-5">

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MediaType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { allowedImageTypes, sanitizeFileName } from "@/lib/validation";
+import { sanitizeFileName } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 import { requireSameOrigin, resolveInside } from "@/lib/security";
 
@@ -27,6 +27,10 @@ function mediaError(request: NextRequest, reason: string, status = 400) {
     return NextResponse.redirect(url, 303);
   }
   return NextResponse.json({ error: reason }, { status });
+}
+
+function serverError(request: NextRequest) {
+  return mediaError(request, "server", 500);
 }
 
 async function deleteStoredFiles(items: Array<{ fileUrl: string; thumbnailUrl: string | null }>) {
@@ -52,29 +56,32 @@ async function deleteMedia(request: NextRequest, id: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const csrf = requireSameOrigin(request);
-  if (csrf) return csrf;
-  const user = await requireUser(UserRole.SELLER);
-  const form = await request.formData();
-  if (form.get("intent") === "delete") {
-    const id = String(form.get("mediaId") ?? "");
-    if (!id) return mediaError(request, "missing");
-    return deleteMedia(request, id);
-  }
-  const files = [...form.getAll("files"), ...form.getAll("file")].filter((item): item is File => item instanceof File && item.size > 0);
-  const mediaType = String(form.get("mediaType") ?? "GALLERY") as MediaType;
-  if (!Object.values(MediaType).includes(mediaType)) return mediaError(request, "type");
-  if (files.length === 0) return mediaError(request, "missing");
-  if (mediaType !== MediaType.GALLERY && files.length > 1) return mediaError(request, "single");
-  if (files.some((file) => file.type && !allowedImageTypes.includes(file.type as never))) return mediaError(request, "type");
-  const maxBytes = Number(process.env.MAX_UPLOAD_MB ?? 6) * 1024 * 1024;
-  if (files.some((file) => file.size > maxBytes)) return mediaError(request, "size");
+  try {
+    const csrf = requireSameOrigin(request);
+    if (csrf) return csrf;
+    const user = await requireUser(UserRole.SELLER);
+    const contentLength = Number(request.headers.get("content-length") ?? 0);
+    const maxRequestBytes = Number(process.env.MAX_UPLOAD_REQUEST_MB ?? 32) * 1024 * 1024;
+    if (contentLength > maxRequestBytes) return mediaError(request, "request-size", 413);
+    const form = await request.formData();
+    if (form.get("intent") === "delete") {
+      const id = String(form.get("mediaId") ?? "");
+      if (!id) return mediaError(request, "missing");
+      return deleteMedia(request, id);
+    }
+    const files = [...form.getAll("files"), ...form.getAll("file")].filter((item): item is File => item instanceof File && item.size > 0);
+    const mediaType = String(form.get("mediaType") ?? "GALLERY") as MediaType;
+    if (!Object.values(MediaType).includes(mediaType)) return mediaError(request, "type");
+    if (files.length === 0) return mediaError(request, "missing");
+    if (mediaType !== MediaType.GALLERY && files.length > 1) return mediaError(request, "single");
+    const maxBytes = Number(process.env.MAX_UPLOAD_MB ?? 6) * 1024 * 1024;
+    if (files.some((file) => file.size > maxBytes)) return mediaError(request, "size");
 
-  const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id }, include: { media: true } });
-  const galleryCount = profile.media.filter((item) => item.mediaType === MediaType.GALLERY).length;
-  if (mediaType === MediaType.GALLERY && galleryCount + files.length > maxGalleryImages) {
-    return mediaError(request, "count");
-  }
+    const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id }, include: { media: true } });
+    const galleryCount = profile.media.filter((item) => item.mediaType === MediaType.GALLERY).length;
+    if (mediaType === MediaType.GALLERY && galleryCount + files.length > maxGalleryImages) {
+      return mediaError(request, "count");
+    }
 
   const uploadRoot = path.resolve(process.env.UPLOAD_DIR ?? "./public/uploads");
   const sellerDir = resolveInside(uploadRoot, profile.id);
@@ -96,7 +103,6 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const detectedType = detectedImageType(buffer);
     if (!detectedType) return mediaError(request, "type");
-    if (file.type && file.type !== detectedType) return mediaError(request, "type");
     const image = sharp(buffer);
     const metadata = await image.metadata().catch(() => null);
     if (!metadata?.width || !metadata.height) return mediaError(request, "invalid");
@@ -144,6 +150,10 @@ export async function POST(request: NextRequest) {
   if (replaced.length > 0) deleteStoredFiles(replaced).catch(console.error);
   audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded }).catch(console.error);
   return NextResponse.redirect(new URL("/seller/application?mediaUploaded=1", request.url), 303);
+  } catch (error) {
+    console.error(error);
+    return serverError(request);
+  }
 }
 
 export async function DELETE(request: NextRequest) {
