@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessCategories, businessStages } from "@/lib/validation";
 import { FeedbackModal } from "@/components/FeedbackModal";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ function readableSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string; submitted?: string }> }) {
+export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string; submitted?: string; mediaUploaded?: string }> }) {
   let user;
   try {
     user = await requireUser(UserRole.SELLER);
@@ -53,14 +54,16 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
   const mediaErrorMessage =
     params.mediaError === "type"
       ? "Upload JPG, PNG, or WebP images only."
-      : params.mediaError === "size"
-        ? "One or more images is too large."
+        : params.mediaError === "size"
+          ? "One or more images is too large."
         : params.mediaError === "count"
           ? "Product image uploads are limited to 5 total."
           : params.mediaError === "single"
             ? "Profile pictures and business logos accept one image at a time."
             : params.mediaError === "invalid"
               ? "One or more images could not be processed."
+              : params.mediaError === "missing"
+                ? "Choose an image before uploading."
               : params.mediaError
                 ? "The image upload could not be completed."
                 : null;
@@ -144,22 +147,23 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
       </form>
       <div className="mt-8 grid gap-5 rounded-lg border border-stone-200 bg-white p-5">
         <h2 className="text-xl font-black">Upload Images</h2>
+        {params.mediaUploaded === "1" && <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-900" role="status">Image uploaded. It is shown below.</p>}
         {mediaErrorMessage && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{mediaErrorMessage}</p>}
         <div className="grid gap-4 md:grid-cols-3">
           <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
             <input type="hidden" name="mediaType" value={MediaType.PROFILE} />
             <label className="field"><span className="label">Profile picture</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <button className="btn btn-primary" type="submit">Upload Profile Picture</button>
+            <PendingSubmitButton pendingLabel="Uploading...">Upload Profile Picture</PendingSubmitButton>
           </form>
           <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
             <input type="hidden" name="mediaType" value={MediaType.LOGO} />
             <label className="field"><span className="label">Business logo</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <button className="btn btn-primary" type="submit">Upload Business Logo</button>
+            <PendingSubmitButton pendingLabel="Uploading...">Upload Business Logo</PendingSubmitButton>
           </form>
           <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
             <input type="hidden" name="mediaType" value={MediaType.GALLERY} />
             <label className="field"><span className="label">Product images</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple required /></label>
-            <button className="btn btn-primary" type="submit">Upload Product Images</button>
+            <PendingSubmitButton pendingLabel="Uploading...">Upload Product Images</PendingSubmitButton>
           </form>
         </div>
         <div className="grid gap-5">

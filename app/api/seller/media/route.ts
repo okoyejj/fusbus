@@ -12,6 +12,13 @@ import { requireSameOrigin, resolveInside } from "@/lib/security";
 
 const maxGalleryImages = 5;
 
+function detectedImageType(buffer: Buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a) return "image/png";
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return null;
+}
+
 function mediaError(request: NextRequest, reason: string, status = 400) {
   const accept = request.headers.get("accept") ?? "";
   if (!accept.includes("application/json")) {
@@ -39,8 +46,8 @@ async function deleteMedia(request: NextRequest, id: string) {
   const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { id: true, fileUrl: true, thumbnailUrl: true } });
   if (items.length === 0) return NextResponse.redirect(new URL("/seller/application", request.url), 303);
   await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
-  await deleteStoredFiles(items);
-  await audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id });
+  deleteStoredFiles(items).catch(console.error);
+  audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id }).catch(console.error);
   return NextResponse.redirect(new URL("/seller/application", request.url), 303);
 }
 
@@ -59,7 +66,7 @@ export async function POST(request: NextRequest) {
   if (!Object.values(MediaType).includes(mediaType)) return mediaError(request, "type");
   if (files.length === 0) return mediaError(request, "missing");
   if (mediaType !== MediaType.GALLERY && files.length > 1) return mediaError(request, "single");
-  if (files.some((file) => !allowedImageTypes.includes(file.type as never))) return mediaError(request, "type");
+  if (files.some((file) => file.type && !allowedImageTypes.includes(file.type as never))) return mediaError(request, "type");
   const maxBytes = Number(process.env.MAX_UPLOAD_MB ?? 6) * 1024 * 1024;
   if (files.some((file) => file.size > maxBytes)) return mediaError(request, "size");
 
@@ -87,6 +94,9 @@ export async function POST(request: NextRequest) {
   }> = [];
   for (const [index, file] of files.entries()) {
     const buffer = Buffer.from(await file.arrayBuffer());
+    const detectedType = detectedImageType(buffer);
+    if (!detectedType) return mediaError(request, "type");
+    if (file.type && file.type !== detectedType) return mediaError(request, "type");
     const image = sharp(buffer);
     const metadata = await image.metadata().catch(() => null);
     if (!metadata?.width || !metadata.height) return mediaError(request, "invalid");
@@ -131,9 +141,9 @@ export async function POST(request: NextRequest) {
     }
     return records;
   });
-  if (replaced.length > 0) await deleteStoredFiles(replaced);
-  await audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded });
-  return NextResponse.redirect(new URL("/seller/application", request.url), 303);
+  if (replaced.length > 0) deleteStoredFiles(replaced).catch(console.error);
+  audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded }).catch(console.error);
+  return NextResponse.redirect(new URL("/seller/application?mediaUploaded=1", request.url), 303);
 }
 
 export async function DELETE(request: NextRequest) {
@@ -145,7 +155,7 @@ export async function DELETE(request: NextRequest) {
   const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
   const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { fileUrl: true, thumbnailUrl: true } });
   await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
-  await deleteStoredFiles(items);
-  await audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id });
+  deleteStoredFiles(items).catch(console.error);
+  audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id }).catch(console.error);
   return NextResponse.json({ ok: true });
 }
