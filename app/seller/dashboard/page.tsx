@@ -37,7 +37,7 @@ export default async function SellerDashboardPage() {
         <article className="rounded-lg border border-stone-200 bg-white p-5">
           <h2 className="font-black">Images</h2>
           <p className="mt-3 text-4xl font-black text-forest">{profile.media.length}</p>
-          <p className="mt-2 text-sm text-stone-700">Profile, logo, and up to ten product images.</p>
+          <p className="mt-2 text-sm text-stone-700">Profile, logo, and up to five product images.</p>
         </article>
         <article className="rounded-lg border border-stone-200 bg-white p-5">
           <h2 className="font-black">Timeline</h2>

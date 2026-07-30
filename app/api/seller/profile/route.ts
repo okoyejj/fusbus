@@ -15,6 +15,12 @@ function validationRedirect(request: NextRequest, fields: string[]) {
   return NextResponse.redirect(url, 303);
 }
 
+function serverErrorRedirect(request: NextRequest) {
+  const url = new URL("/seller/application", request.url);
+  url.searchParams.set("submitError", "server");
+  return NextResponse.redirect(url, 303);
+}
+
 export async function GET() {
   const user = await requireUser(UserRole.SELLER);
   const profile = await prisma.sellerProfile.findUnique({ where: { userId: user.id }, include: { media: true } });
@@ -40,15 +46,26 @@ export async function POST(request: NextRequest) {
     });
     if (draftParsed.success) {
       const oldDraft = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
-      await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, draftParsed.data, false, oldDraft?.applicationStatus, oldDraft?.submittedAt));
+      try {
+        await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, draftParsed.data, false, oldDraft?.applicationStatus, oldDraft?.submittedAt));
+      } catch (error) {
+        console.error(error);
+        return serverErrorRedirect(request);
+      }
     }
     return validationRedirect(request, Object.keys(parsed.error.flatten().fieldErrors));
   }
   const oldProfile = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
-  const profile = await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, parsed.data, submit, oldProfile?.applicationStatus, oldProfile?.submittedAt));
-  await audit(request, { actorUserId: user.id, action: submit ? "SELLER_SUBMITTED" : "SELLER_DRAFT_SAVED", entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile });
+  let profile;
+  try {
+    profile = await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, parsed.data, submit, oldProfile?.applicationStatus, oldProfile?.submittedAt));
+  } catch (error) {
+    console.error(error);
+    return serverErrorRedirect(request);
+  }
+  audit(request, { actorUserId: user.id, action: submit ? "SELLER_SUBMITTED" : "SELLER_DRAFT_SAVED", entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile }).catch(console.error);
   if (submit) {
-    await queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." });
+    queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." }).catch(console.error);
   }
   return NextResponse.redirect(new URL("/seller/dashboard", request.url), 303);
 }

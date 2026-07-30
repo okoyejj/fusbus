@@ -25,6 +25,12 @@ const fieldLabels: Record<string, string> = {
   consentPublish: "Consent to publish approved profile information"
 };
 
+const requiredForSubmit = new Set(["city", "region", "category", "productsOrServices", "businessStage", "supportNeeded"]);
+
+function labelText(name: string, label: string) {
+  return requiredForSubmit.has(name) ? `${label} *` : label;
+}
+
 export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string }> }) {
   let user;
   try {
@@ -59,23 +65,28 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-black">Entrepreneur Application Form</h1>
+      <p className="mt-2 text-sm text-stone-700">Fields marked * are required before submitting for review. You can save a draft at any time.</p>
       {params.submitError && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
-          <p className="font-black">Complete the required review fields before submitting.</p>
-          <p className="mt-1">Your draft values were saved where possible. Please check: {invalidFields.map((field) => fieldLabels[field] ?? field).join(", ")}.</p>
+          <p className="font-black">{params.submitError === "server" ? "Your application could not be saved." : "Your draft was saved, but it is not ready to submit yet."}</p>
+          <p className="mt-1">
+            {params.submitError === "server"
+              ? "Please try again. If this keeps happening, contact the FusBus team with the email address used for this account."
+              : `Your draft values were saved where possible. Please check: ${invalidFields.map((field) => fieldLabels[field] ?? field).join(", ")}.`}
+          </p>
         </div>
       )}
       <form action="/api/seller/profile" method="post" className="mt-8 grid gap-5 rounded-lg border border-stone-200 bg-white p-5 shadow-soft">
         <div className="grid gap-5 md:grid-cols-2">
           {fields.map(([name, label]) => (
             <label className="field" key={name}>
-              <span className="label">{label}</span>
+              <span className="label">{labelText(name, label)}</span>
               <input className="input" name={name} defaultValue={value(profile[name])} />
               {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
             </label>
           ))}
           <label className="field">
-            <span className="label">Current business stage</span>
+            <span className="label">Current business stage *</span>
             <select className="input" name="businessStage" defaultValue={value(profile.businessStage)}>
               <option value="">Select a business stage</option>
               {businessStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
@@ -88,7 +99,7 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
         </div>
         {longFields.map(([name, label]) => (
           <label className="field" key={name}>
-            <span className="label">{label}</span>
+            <span className="label">{labelText(name, label)}</span>
             <textarea className="input min-h-28" name={name} defaultValue={value(name === "socialLinks" && profile.socialLinks ? JSON.stringify(profile.socialLinks) : profile[name])} />
             {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
           </label>

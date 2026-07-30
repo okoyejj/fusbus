@@ -13,7 +13,7 @@ export function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const csrf = requireSameOrigin(request);
   if (csrf) return formError(request, "/seller/register", "blocked", "For your security, that registration request could not be verified.", 403);
-  const limited = rateLimit(request, "register", 5, 60 * 60 * 1000);
+  const limited = rateLimit(request, "register", 20, 60 * 60 * 1000);
   if (limited) return formError(request, "/seller/register", "limited", "Too many registration attempts. Please wait and try again.", 429);
   const body = Object.fromEntries((await request.formData()).entries());
   const parsed = registerSchema.safeParse(body);
@@ -34,12 +34,12 @@ export async function POST(request: NextRequest) {
       }
     }
   });
-  await queueNotification({
+  queueNotification({
     userId: user.id,
     type: "SELLER_REGISTRATION",
     subject: "Welcome to FusBus Cameroon",
     message: "Your entrepreneur account has been created. Please complete your onboarding application."
-  });
+  }).catch(console.error);
   await createSession(user.id);
-  return NextResponse.redirect(new URL("/seller/dashboard", publicOrigin(request)), 303);
+  return NextResponse.redirect(new URL("/seller/application", publicOrigin(request)), 303);
 }

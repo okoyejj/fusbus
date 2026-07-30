@@ -24,7 +24,11 @@ export default async function SellerRegisterPage({ searchParams }: { searchParam
         <label className="field"><span className="label">Full name</span><input className="input" name="fullName" required autoComplete="name" /></label>
         <label className="field"><span className="label">Business or trading name</span><input className="input" name="businessName" required /></label>
         <label className="field"><span className="label">Email address</span><input className="input" name="email" type="email" required autoComplete="email" /></label>
-        <label className="field"><span className="label">Password</span><input className="input" name="password" type="password" required autoComplete="new-password" minLength={10} /></label>
+        <label className="field">
+          <span className="label">Password</span>
+          <input className="input" name="password" type="password" required autoComplete="new-password" minLength={10} />
+          <span className="text-sm text-stone-600">Use at least 10 characters with uppercase, lowercase, and a number.</span>
+        </label>
         <button className="btn btn-primary" type="submit">Create Account</button>
       </form>
       <p className="mt-4 text-sm text-stone-700">Already registered? <Link className="font-bold text-forest" href="/seller/login">Log in</Link></p>

@@ -68,11 +68,8 @@ export const submitSellerSchema = sellerProfileSchema.extend({
   city: z.string().min(2).max(80),
   region: z.string().min(2).max(80),
   category: z.string().min(2).max(80),
-  productsOrServices: z.string().min(10).max(2000),
+  productsOrServices: z.string().min(2).max(2000),
   businessStage: z.enum(businessStages),
-  shortSummary: z.string().min(20).max(300),
-  journeyStory: z.string().min(80).max(6000),
-  challenges: z.string().min(10).max(2000),
   supportNeeded: z.string().min(2).max(500),
   consentReview: z.literal(true),
   consentPublish: z.literal(true)
