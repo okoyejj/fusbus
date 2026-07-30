@@ -67,5 +67,5 @@ export async function POST(request: NextRequest) {
   if (submit) {
     queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." }).catch(console.error);
   }
-  return NextResponse.redirect(new URL("/seller/dashboard", request.url), 303);
+  return NextResponse.redirect(new URL(submit ? "/seller/application?submitted=1" : "/seller/dashboard", request.url), 303);
 }

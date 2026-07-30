@@ -3,6 +3,7 @@ import { MediaType, UserRole } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessCategories, businessStages } from "@/lib/validation";
+import { FeedbackModal } from "@/components/FeedbackModal";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ function readableSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string }> }) {
+export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string; submitted?: string }> }) {
   let user;
   try {
     user = await requireUser(UserRole.SELLER);
@@ -77,6 +78,15 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+      <FeedbackModal
+        open={params.submitted === "1"}
+        title="Application submitted"
+        message="Your entrepreneur application has been submitted for review. The FusBus team will check your profile and contact you if anything else is needed."
+        primaryHref="/seller/dashboard"
+        primaryLabel="Go to Dashboard"
+        closeHref="/seller/application"
+        secondaryLabel="Continue Editing"
+      />
       <h1 className="text-3xl font-black">Entrepreneur Application Form</h1>
       <p className="mt-2 text-sm text-stone-700">Fields marked * are required before submitting for review. You can save a draft at any time.</p>
       {params.submitError && (
