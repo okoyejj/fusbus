@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { MediaType, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessCategories, businessStages } from "@/lib/validation";
 import { FeedbackModal } from "@/components/FeedbackModal";
+import { SellerMediaManager } from "@/components/SellerMediaManager";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,6 @@ function labelText(name: string, label: string) {
   return requiredForSubmit.has(name) ? `${label} *` : label;
 }
 
-function readableSize(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export default async function SellerApplicationPage({ searchParams }: { searchParams: Promise<{ submitError?: string; fields?: string; mediaError?: string; submitted?: string; mediaUploaded?: string }> }) {
   let user;
   try {
@@ -50,36 +46,11 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
     where: { userId: user.id },
     include: { media: { orderBy: [{ mediaType: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }] } }
   });
-  const mediaErrorMessage =
-    params.mediaError === "type"
-      ? "Upload JPG, PNG, or WebP images only."
-        : params.mediaError === "size"
-          ? "One or more images is too large."
-        : params.mediaError === "count"
-          ? "Product image uploads are limited to 5 total."
-          : params.mediaError === "single"
-            ? "Profile pictures and business logos accept one image at a time."
-            : params.mediaError === "invalid"
-              ? "One or more images could not be processed."
-              : params.mediaError === "missing"
-                ? "Choose an image before uploading."
-                : params.mediaError === "request-size"
-                  ? "The selected images are too large to upload together. Upload fewer or smaller images."
-                  : params.mediaError === "server"
-                    ? "The image upload could not be completed. Please try one image at a time."
-              : params.mediaError
-                ? "The image upload could not be completed."
-                : null;
   const fields = [
     ["fullName", "Full name"], ["businessName", "Business or trading name"], ["phoneNumber", "Phone number"], ["whatsappNumber", "WhatsApp number"], ["city", "Town or city"], ["region", "Region"], ["websiteUrl", "Website link"]
   ] as const;
   const longFields = [
     ["productsOrServices", "Products or services offered"], ["shortSummary", "Short summary"], ["journeyStory", "Detailed entrepreneurial journey"], ["challenges", "Challenges currently faced"], ["achievements", "Achievements so far"], ["communityImpact", "Impact on family or community"], ["futureGoals", "Future ambitions"], ["supportNeeded", "Type of support needed"], ["useOfFunds", "How investment or sponsorship would be used"], ["socialLinks", "Social media links"]
-  ] as const;
-  const mediaSections = [
-    { type: MediaType.PROFILE, title: "Profile picture", empty: "No profile picture uploaded yet." },
-    { type: MediaType.LOGO, title: "Business logo", empty: "No business logo uploaded yet." },
-    { type: MediaType.GALLERY, title: "Product images", empty: "No product images uploaded yet." }
   ] as const;
 
   return (
@@ -148,60 +119,15 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           <button className="btn btn-primary" name="intent" value="submit" type="submit">Submit for Review</button>
         </div>
       </form>
-      <div className="mt-8 grid gap-5 rounded-lg border border-stone-200 bg-white p-5">
-        <h2 className="text-xl font-black">Upload Images</h2>
-        {params.mediaUploaded === "1" && <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-900" role="status">Image uploaded. It is shown below.</p>}
-        {mediaErrorMessage && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{mediaErrorMessage}</p>}
-        <div className="grid gap-4 md:grid-cols-3">
-          <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
-            <input type="hidden" name="mediaType" value={MediaType.PROFILE} />
-            <label className="field"><span className="label">Profile picture</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <button className="btn btn-primary" type="submit">Upload Profile Picture</button>
-          </form>
-          <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
-            <input type="hidden" name="mediaType" value={MediaType.LOGO} />
-            <label className="field"><span className="label">Business logo</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <button className="btn btn-primary" type="submit">Upload Business Logo</button>
-          </form>
-          <form action="/api/seller/media" method="post" encType="multipart/form-data" className="grid gap-3">
-            <input type="hidden" name="mediaType" value={MediaType.GALLERY} />
-            <label className="field"><span className="label">Product images</span><input className="input" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple required /></label>
-            <button className="btn btn-primary" type="submit">Upload Product Images</button>
-          </form>
-        </div>
-        <div className="grid gap-5">
-          {mediaSections.map((section) => {
-            const items = profile.media.filter((item) => item.mediaType === section.type);
-            return (
-              <div className="grid gap-3" key={section.type}>
-                <h3 className="font-black">{section.title}</h3>
-                {items.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-stone-300 p-4 text-sm text-stone-600">{section.empty}</p>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {items.map((item) => (
-                      <div className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50" key={item.id}>
-                        <img className="aspect-[4/3] w-full object-cover" src={item.thumbnailUrl ?? item.fileUrl} alt={item.originalFileName} />
-                        <div className="grid gap-3 p-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-stone-900">{item.originalFileName}</p>
-                            <p className="text-xs text-stone-600">{readableSize(item.fileSize)} - {item.isPublic ? "Public" : "Private until approved"}</p>
-                          </div>
-                          <form action="/api/seller/media" method="post">
-                            <input type="hidden" name="intent" value="delete" />
-                            <input type="hidden" name="mediaId" value={item.id} />
-                            <button className="btn btn-secondary w-full" type="submit">Remove</button>
-                          </form>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <SellerMediaManager initialMedia={profile.media.map((item) => ({
+        id: item.id,
+        mediaType: item.mediaType,
+        originalFileName: item.originalFileName,
+        fileUrl: item.fileUrl,
+        thumbnailUrl: item.thumbnailUrl,
+        fileSize: item.fileSize,
+        isPublic: item.isPublic
+      }))} />
     </section>
   );
 }

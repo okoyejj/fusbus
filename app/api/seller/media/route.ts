@@ -29,6 +29,10 @@ function mediaError(request: NextRequest, reason: string, status = 400) {
   return NextResponse.json({ error: reason }, { status });
 }
 
+function wantsJson(request: NextRequest) {
+  return (request.headers.get("accept") ?? "").includes("application/json");
+}
+
 function serverError(request: NextRequest) {
   return mediaError(request, "server", 500);
 }
@@ -44,14 +48,14 @@ async function deleteStoredFiles(items: Array<{ fileUrl: string; thumbnailUrl: s
   })));
 }
 
-async function deleteMedia(request: NextRequest, id: string) {
-  const user = await requireUser(UserRole.SELLER);
+async function deleteMedia(request: NextRequest, id: string, user: Awaited<ReturnType<typeof requireUser>>) {
   const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
   const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { id: true, fileUrl: true, thumbnailUrl: true } });
-  if (items.length === 0) return NextResponse.redirect(new URL("/seller/application", request.url), 303);
+  if (items.length === 0) return mediaError(request, "missing", 404);
   await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
   deleteStoredFiles(items).catch(console.error);
   audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id }).catch(console.error);
+  if (wantsJson(request)) return NextResponse.json({ ok: true, id });
   return NextResponse.redirect(new URL("/seller/application", request.url), 303);
 }
 
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
     if (form.get("intent") === "delete") {
       const id = String(form.get("mediaId") ?? "");
       if (!id) return mediaError(request, "missing");
-      return deleteMedia(request, id);
+      return deleteMedia(request, id, user);
     }
     const files = [...form.getAll("files"), ...form.getAll("file")].filter((item): item is File => item instanceof File && item.size > 0);
     const mediaType = String(form.get("mediaType") ?? "GALLERY") as MediaType;
@@ -149,6 +153,7 @@ export async function POST(request: NextRequest) {
   });
   if (replaced.length > 0) deleteStoredFiles(replaced).catch(console.error);
   audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded }).catch(console.error);
+  if (wantsJson(request)) return NextResponse.json({ ok: true });
   return NextResponse.redirect(new URL("/seller/application?mediaUploaded=1", request.url), 303);
   } catch (error) {
     console.error(error);
@@ -157,15 +162,15 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const csrf = requireSameOrigin(request);
-  if (csrf) return csrf;
-  const id = request.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  const user = await requireUser(UserRole.SELLER);
-  const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
-  const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { fileUrl: true, thumbnailUrl: true } });
-  await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
-  deleteStoredFiles(items).catch(console.error);
-  audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_DELETED", entityType: "SellerMedia", entityId: id }).catch(console.error);
-  return NextResponse.json({ ok: true });
+  try {
+    const csrf = requireSameOrigin(request);
+    if (csrf) return csrf;
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) return mediaError(request, "missing");
+    const user = await requireUser(UserRole.SELLER);
+    return deleteMedia(request, id, user);
+  } catch (error) {
+    console.error(error);
+    return serverError(request);
+  }
 }
