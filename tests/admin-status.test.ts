@@ -51,7 +51,7 @@ describe("admin status updates", () => {
       approvedAt,
       approvedBy: "admin-1",
       isFeatured: false,
-      rejectionReason: "Older reason",
+      rejectionReason: null,
       sellerFacingMessage: "Please add clearer product photos."
     });
   });
@@ -67,6 +67,37 @@ describe("admin status updates", () => {
     expect(data.rejectionReason).toBe("Incomplete identity details");
     expect(publicMediaUpdateForStatus(ApplicationStatus.APPROVED)).toEqual({ isPublic: true });
     expect(publicMediaUpdateForStatus(ApplicationStatus.REJECTED)).toEqual({ isPublic: false });
+  });
+
+  it("clears stale rejection and seller-facing messages on a later decision", () => {
+    const data = adminStatusUpdateData({
+      status: ApplicationStatus.ARCHIVED,
+      oldProfile: { ...oldProfile, rejectionReason: "Previous rejection" },
+      adminId: "admin-1"
+    });
+
+    expect(data.rejectionReason).toBeNull();
+    expect(data.sellerFacingMessage).toBeNull();
+  });
+
+  it.each([
+    ApplicationStatus.UNDER_REVIEW,
+    ApplicationStatus.MORE_INFORMATION_REQUIRED,
+    ApplicationStatus.REJECTED,
+    ApplicationStatus.SUSPENDED,
+    ApplicationStatus.ARCHIVED
+  ])("keeps media private and featured disabled for %s", (status) => {
+    const data = adminStatusUpdateData({
+      status,
+      reason: status === ApplicationStatus.REJECTED ? "Application does not meet the requirements" : undefined,
+      isFeatured: true,
+      oldProfile: { ...oldProfile, isFeatured: true },
+      adminId: "admin-1"
+    });
+
+    expect(data.applicationStatus).toBe(status);
+    expect(data.isFeatured).toBe(false);
+    expect(publicMediaUpdateForStatus(status)).toEqual({ isPublic: false });
   });
 
   it("formats reference ids and notification messages", () => {

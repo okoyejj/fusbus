@@ -114,8 +114,8 @@ export const enquirySchema = z.object({
 
 export const adminStatusSchema = z.object({
   status: z.enum(["UNDER_REVIEW", "MORE_INFORMATION_REQUIRED", "APPROVED", "REJECTED", "SUSPENDED", "ARCHIVED"]),
-  reason: z.string().min(3).max(1000).optional(),
-  sellerFacingMessage: z.string().max(1000).optional(),
+  reason: z.string().min(3, "Use at least 3 characters for the internal reason.").max(1000, "Use 1000 characters or fewer for the internal reason.").optional(),
+  sellerFacingMessage: z.string().max(1000, "Use 1000 characters or fewer for the entrepreneur-facing explanation.").optional(),
   isFeatured: z.boolean().optional()
 });
 

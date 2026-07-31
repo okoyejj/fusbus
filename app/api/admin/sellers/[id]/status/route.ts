@@ -14,7 +14,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const admin = await requireUser(UserRole.ADMIN);
   const params = await context.params;
   const parsed = adminStatusSchema.safeParse(await request.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    const message = Object.values(errors).flat().find(Boolean) ?? "Check the status update fields and try again.";
+    return NextResponse.json({ error: message, fieldErrors: errors }, { status: 400 });
+  }
   if (parsed.data.status === "REJECTED" && !parsed.data.reason) {
     return NextResponse.json({ error: "Rejection requires an internal reason" }, { status: 400 });
   }

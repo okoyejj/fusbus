@@ -27,8 +27,8 @@ export function adminStatusUpdateData(input: {
     sellerReferenceId: approved ? input.oldProfile.sellerReferenceId ?? referenceId(input.now) : input.oldProfile.sellerReferenceId,
     approvedAt: approved ? input.now ?? new Date() : input.oldProfile.approvedAt,
     approvedBy: approved ? input.adminId : input.oldProfile.approvedBy,
-    rejectionReason: input.status === ApplicationStatus.REJECTED ? input.reason : input.oldProfile.rejectionReason,
-    sellerFacingMessage: input.sellerFacingMessage
+    rejectionReason: input.status === ApplicationStatus.REJECTED ? input.reason : null,
+    sellerFacingMessage: input.sellerFacingMessage ?? null
   };
 }
 
