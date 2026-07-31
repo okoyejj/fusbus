@@ -82,13 +82,13 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           {fields.map(([name, label]) => (
             <label className="field" key={name}>
               <span className="label">{labelText(name, label)}</span>
-              <input className="input" name={name} defaultValue={value(profile[name])} />
+              <input className="input" name={name} defaultValue={value(profile[name])} required={requiredForSubmit.has(name)} />
               {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
             </label>
           ))}
           <label className="field">
             <span className="label">Business category *</span>
-            <select className="input" name="category" defaultValue={value(profile.category)}>
+            <select className="input" name="category" defaultValue={value(profile.category)} required>
               <option value="">Select a business category</option>
               {businessCategories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
@@ -96,7 +96,7 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           </label>
           <label className="field">
             <span className="label">Current business stage *</span>
-            <select className="input" name="businessStage" defaultValue={value(profile.businessStage)}>
+            <select className="input" name="businessStage" defaultValue={value(profile.businessStage)} required>
               <option value="">Select a business stage</option>
               {businessStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
             </select>
@@ -109,14 +109,14 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
         {longFields.map(([name, label]) => (
           <label className="field" key={name}>
             <span className="label">{labelText(name, label)}</span>
-            <textarea className="input min-h-28" name={name} defaultValue={value(name === "socialLinks" && profile.socialLinks ? JSON.stringify(profile.socialLinks) : profile[name])} />
+            <textarea className="input min-h-28" name={name} defaultValue={value(name === "socialLinks" && profile.socialLinks ? JSON.stringify(profile.socialLinks) : profile[name])} required={requiredForSubmit.has(name)} />
             {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
           </label>
         ))}
         <label className="flex gap-3 text-sm font-semibold"><input type="checkbox" name="consentReview" defaultChecked={profile.consentReview} required /> I consent to FusBus storing and reviewing my information.</label>
         <label className="flex gap-3 text-sm font-semibold"><input type="checkbox" name="consentPublish" defaultChecked={profile.consentPublish} required /> I consent to approved profile information being published.</label>
         <div className="flex flex-wrap gap-3">
-          <button className="btn btn-secondary" name="intent" value="draft" type="submit">Save Draft</button>
+          <button className="btn btn-secondary" name="intent" value="draft" type="submit" formNoValidate>Save Draft</button>
           <button className="btn btn-primary" name="intent" value="submit" type="submit">Submit for Review</button>
         </div>
       </SellerApplicationForm>

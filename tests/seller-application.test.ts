@@ -58,5 +58,9 @@ describe("seller application persistence", () => {
     const submitArgs = sellerProfileUpsertArgs("user-1", draft, true, ApplicationStatus.DRAFT, null);
     expect(submitArgs.update.applicationStatus).toBe(ApplicationStatus.SUBMITTED);
     expect(submitArgs.update.submittedAt).toBeInstanceOf(Date);
+
+    const resubmittedReview = sellerProfileUpsertArgs("user-1", draft, true, ApplicationStatus.UNDER_REVIEW, null);
+    expect(resubmittedReview.update.applicationStatus).toBe(ApplicationStatus.UNDER_REVIEW);
+    expect(resubmittedReview.update.submittedAt).toBeInstanceOf(Date);
   });
 });

@@ -38,7 +38,13 @@ export function sellerProfilePersistenceData(data: SellerProfileFormData) {
 export function sellerProfileUpsertArgs(userId: string, data: SellerProfileFormData, submit: boolean, previousStatus?: ApplicationStatus, previousSubmittedAt?: Date | null) {
   const persisted = sellerProfilePersistenceData(data);
   const submittedAt = submit ? new Date() : previousSubmittedAt ?? null;
-  const status = submit ? ApplicationStatus.SUBMITTED : previousStatus ?? ApplicationStatus.DRAFT;
+  const preserveReviewStatus = previousStatus === ApplicationStatus.UNDER_REVIEW
+    || previousStatus === ApplicationStatus.APPROVED
+    || previousStatus === ApplicationStatus.SUSPENDED
+    || previousStatus === ApplicationStatus.ARCHIVED;
+  const status = submit && !preserveReviewStatus
+    ? ApplicationStatus.SUBMITTED
+    : previousStatus ?? ApplicationStatus.DRAFT;
 
   return {
     where: { userId },
