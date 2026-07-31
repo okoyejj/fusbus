@@ -29,6 +29,12 @@ describe("seller application validation", () => {
     expect(result.success).toBe(false);
   });
 
+  it("states the exact text limit when a field is too long", () => {
+    const result = submitSellerSchema.partial().safeParse({ shortSummary: "x".repeat(301) });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.flatten().fieldErrors.shortSummary).toContain("Use 300 characters or fewer.");
+  });
+
   it("allows blank optional website and number fields while saving a draft", () => {
     const result = submitSellerSchema.partial().safeParse({
       fullName: "Valid Seller",

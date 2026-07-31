@@ -12,9 +12,10 @@ function wantsJson(request: NextRequest) {
   return (request.headers.get("accept") ?? "").includes("application/json");
 }
 
-function validationResponse(request: NextRequest, fields: string[], draftSaved: boolean) {
+function validationResponse(request: NextRequest, fieldErrors: Record<string, string[] | undefined>, draftSaved: boolean) {
+  const fields = Object.keys(fieldErrors);
   if (wantsJson(request)) {
-    return NextResponse.json({ error: "validation", fields, draftSaved }, { status: 422 });
+    return NextResponse.json({ error: "validation", fields, fieldErrors, draftSaved }, { status: 422 });
   }
   const url = new URL("/seller/application", request.url);
   url.searchParams.set("submitError", "1");
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
         return serverErrorRedirect(request);
       }
     }
-    return validationResponse(request, Object.keys(parsed.error.flatten().fieldErrors), draftSaved);
+    return validationResponse(request, parsed.error.flatten().fieldErrors, draftSaved);
   }
   const oldProfile = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
   let profile;

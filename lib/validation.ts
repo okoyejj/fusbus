@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 const blankToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
-const optionalText = (max: number) => z.preprocess(blankToNull, z.string().trim().max(max).nullable().optional());
+const optionalText = (max: number) => z.preprocess(blankToNull, z.string().trim().max(max, `Use ${max} characters or fewer.`).nullable().optional());
 const optionalNumber = (max: number) => z.preprocess(blankToNull, z.coerce.number().int().min(0).max(max).nullable().optional());
 const optionalMoney = z.preprocess(blankToNull, z.coerce.number().nonnegative().nullable().optional());
-const optionalUrl = z.preprocess(blankToNull, z.string().trim().url().nullable().optional());
+const optionalUrl = z.preprocess(blankToNull, z.string().trim().max(500, "Use 500 characters or fewer.").url("Enter a complete URL, including https://").nullable().optional());
 
 export const businessStages = [
   "Idea or concept",
@@ -57,8 +57,8 @@ export const loginSchema = z.object({
 });
 
 export const sellerProfileSchema = z.object({
-  fullName: z.string().trim().max(120),
-  businessName: z.string().trim().max(140),
+  fullName: z.string().trim().max(120, "Use 120 characters or fewer."),
+  businessName: z.string().trim().max(140, "Use 140 characters or fewer."),
   phoneNumber: optionalText(40),
   whatsappNumber: optionalText(40),
   city: optionalText(80),
@@ -84,15 +84,15 @@ export const sellerProfileSchema = z.object({
 });
 
 export const submitSellerSchema = sellerProfileSchema.extend({
-  fullName: z.string().trim().min(2).max(120),
-  businessName: z.string().trim().min(2).max(140),
-  city: z.string().min(2).max(80),
-  region: z.string().min(2).max(80),
+  fullName: z.string().trim().min(2).max(120, "Use 120 characters or fewer."),
+  businessName: z.string().trim().min(2).max(140, "Use 140 characters or fewer."),
+  city: z.string().min(2).max(80, "Use 80 characters or fewer."),
+  region: z.string().min(2).max(80, "Use 80 characters or fewer."),
   category: z.enum(businessCategories),
-  productsOrServices: z.string().min(2).max(2000),
+  productsOrServices: z.string().min(2).max(2000, "Use 2000 characters or fewer."),
   businessStage: z.enum(businessStages),
   websiteUrl: optionalUrl,
-  supportNeeded: z.string().min(2).max(500),
+  supportNeeded: z.string().min(2).max(500, "Use 500 characters or fewer."),
   consentReview: z.literal(true),
   consentPublish: z.literal(true)
 });

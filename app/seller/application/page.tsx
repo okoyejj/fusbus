@@ -6,6 +6,7 @@ import { businessCategories, businessStages } from "@/lib/validation";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { SellerMediaManager } from "@/components/SellerMediaManager";
 import { SellerApplicationForm } from "@/components/SellerApplicationForm";
+import { CountedTextarea } from "@/components/CountedTextarea";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +49,10 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
     include: { media: { orderBy: [{ mediaType: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }] } }
   });
   const fields = [
-    ["fullName", "Full name"], ["businessName", "Business or trading name"], ["phoneNumber", "Phone number"], ["whatsappNumber", "WhatsApp number"], ["city", "Town or city"], ["region", "Region"], ["websiteUrl", "Website link"]
+    ["fullName", "Full name", 120], ["businessName", "Business or trading name", 140], ["phoneNumber", "Phone number", 40], ["whatsappNumber", "WhatsApp number", 40], ["city", "Town or city", 80], ["region", "Region", 80], ["websiteUrl", "Website link", 500]
   ] as const;
   const longFields = [
-    ["productsOrServices", "Products or services offered"], ["shortSummary", "Short summary"], ["journeyStory", "Detailed entrepreneurial journey"], ["challenges", "Challenges currently faced"], ["achievements", "Achievements so far"], ["communityImpact", "Impact on family or community"], ["futureGoals", "Future ambitions"], ["supportNeeded", "Type of support needed"], ["useOfFunds", "How investment or sponsorship would be used"], ["socialLinks", "Social media links"]
+    ["productsOrServices", "Products or services offered", 2000], ["shortSummary", "Short summary", 300], ["journeyStory", "Detailed entrepreneurial journey", 6000], ["challenges", "Challenges currently faced", 2000], ["achievements", "Achievements so far", 2000], ["communityImpact", "Impact on family or community", 2000], ["futureGoals", "Future ambitions", 2000], ["supportNeeded", "Type of support needed", 500], ["useOfFunds", "How investment or sponsorship would be used", 2000], ["socialLinks", "Social media links", 1000]
   ] as const;
 
   return (
@@ -79,10 +80,10 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
       )}
       <SellerApplicationForm>
         <div className="grid gap-5 md:grid-cols-2">
-          {fields.map(([name, label]) => (
+          {fields.map(([name, label, maxLength]) => (
             <label className="field" key={name}>
               <span className="label">{labelText(name, label)}</span>
-              <input className="input" name={name} defaultValue={value(profile[name])} required={requiredForSubmit.has(name)} />
+              <input className="input" name={name} defaultValue={value(profile[name])} required={requiredForSubmit.has(name)} maxLength={maxLength} />
               {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
             </label>
           ))}
@@ -106,10 +107,10 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           <label className="field"><span className="label">Number of employees</span><input className="input" name="employeeCount" type="number" min="0" defaultValue={value(profile.employeeCount)} /></label>
           <label className="field"><span className="label">Funding amount sought</span><input className="input" name="fundingAmount" type="number" min="0" defaultValue={value(profile.fundingAmount)} /></label>
         </div>
-        {longFields.map(([name, label]) => (
+        {longFields.map(([name, label, maxLength]) => (
           <label className="field" key={name}>
             <span className="label">{labelText(name, label)}</span>
-            <textarea className="input min-h-28" name={name} defaultValue={value(name === "socialLinks" && profile.socialLinks ? JSON.stringify(profile.socialLinks) : profile[name])} required={requiredForSubmit.has(name)} />
+            <CountedTextarea name={name} defaultValue={value(name === "socialLinks" && profile.socialLinks ? JSON.stringify(profile.socialLinks) : profile[name])} maxLength={maxLength} required={requiredForSubmit.has(name)} />
             {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
           </label>
         ))}

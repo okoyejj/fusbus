@@ -20,6 +20,7 @@ const fieldLabels: Record<string, string> = {
 type Result = {
   error?: string;
   fields?: string[];
+  fieldErrors?: Record<string, string[] | undefined>;
   draftSaved?: boolean;
   submitted?: boolean;
 };
@@ -61,7 +62,11 @@ export function SellerApplicationForm({ children }: { children: ReactNode }) {
         if (result.error === "validation") {
           const invalidFields = result.fields ?? [];
           const fields = invalidFields.map((field) => fieldLabels[field] ?? field).join(", ");
-          setFeedback(`${result.draftSaved ? "Your entries were saved as a draft. " : "Your entries remain in the form. "}Please check: ${fields || "the required fields"}.`);
+          const details = invalidFields
+            .flatMap((field) => result.fieldErrors?.[field] ?? [])
+            .filter((message, index, messages) => messages.indexOf(message) === index)
+            .join(" ");
+          setFeedback(`${result.draftSaved ? "Your entries were saved as a draft. " : "Your entries remain in the form. "}Please check: ${fields || "the required fields"}.${details ? ` ${details}` : ""}`);
           invalidFields.forEach((field) => {
             const control = form.elements.namedItem(field);
             if (control instanceof HTMLElement) control.setAttribute("aria-invalid", "true");
