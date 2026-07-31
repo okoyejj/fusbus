@@ -57,8 +57,8 @@ export const loginSchema = z.object({
 });
 
 export const sellerProfileSchema = z.object({
-  fullName: z.string().trim().min(2).max(120),
-  businessName: z.string().trim().min(2).max(140),
+  fullName: z.string().trim().max(120),
+  businessName: z.string().trim().max(140),
   phoneNumber: optionalText(40),
   whatsappNumber: optionalText(40),
   city: optionalText(80),
@@ -68,7 +68,7 @@ export const sellerProfileSchema = z.object({
   yearsInBusiness: optionalNumber(100),
   employeeCount: optionalNumber(100000),
   businessStage: optionalBusinessStage,
-  websiteUrl: optionalUrl,
+  websiteUrl: optionalText(500),
   socialLinks: optionalText(1000),
   shortSummary: optionalText(300),
   journeyStory: optionalText(6000),
@@ -84,11 +84,14 @@ export const sellerProfileSchema = z.object({
 });
 
 export const submitSellerSchema = sellerProfileSchema.extend({
+  fullName: z.string().trim().min(2).max(120),
+  businessName: z.string().trim().min(2).max(140),
   city: z.string().min(2).max(80),
   region: z.string().min(2).max(80),
   category: z.enum(businessCategories),
   productsOrServices: z.string().min(2).max(2000),
   businessStage: z.enum(businessStages),
+  websiteUrl: optionalUrl,
   supportNeeded: z.string().min(2).max(500),
   consentReview: z.literal(true),
   consentPublish: z.literal(true)

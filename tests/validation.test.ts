@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedImageTypes, registerSchema, sanitizeFileName, submitSellerSchema } from "@/lib/validation";
+import { allowedImageTypes, registerSchema, sanitizeFileName, sellerProfileSchema, submitSellerSchema } from "@/lib/validation";
 
 describe("seller registration validation", () => {
   it("requires a strong password and valid seller identity", () => {
@@ -9,6 +9,26 @@ describe("seller registration validation", () => {
 });
 
 describe("seller application validation", () => {
+  it("preserves incomplete identity and malformed website values in a draft", () => {
+    const result = sellerProfileSchema.safeParse({
+      fullName: "",
+      businessName: "",
+      websiteUrl: "my-business.example",
+      consentReview: false,
+      consentPublish: false
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects incomplete identity and malformed website values on submission", () => {
+    const result = submitSellerSchema.partial().safeParse({
+      fullName: "",
+      businessName: "",
+      websiteUrl: "my-business.example"
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("allows blank optional website and number fields while saving a draft", () => {
     const result = submitSellerSchema.partial().safeParse({
       fullName: "Valid Seller",

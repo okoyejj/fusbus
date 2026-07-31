@@ -49,6 +49,10 @@ svg {
   @apply min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-base shadow-sm transition focus:border-forest;
 }
 
+.input[aria-invalid="true"] {
+  @apply border-red-600 ring-1 ring-red-600;
+}
+
 .btn {
   @apply inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 py-2 text-center text-sm font-semibold transition sm:w-auto;
 }

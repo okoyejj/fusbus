@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { businessCategories, businessStages } from "@/lib/validation";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { SellerMediaManager } from "@/components/SellerMediaManager";
+import { SellerApplicationForm } from "@/components/SellerApplicationForm";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           </p>
         </div>
       )}
-      <form action="/api/seller/profile" method="post" className="mt-8 grid gap-5 rounded-lg border border-stone-200 bg-white p-5 shadow-soft">
+      <SellerApplicationForm>
         <div className="grid gap-5 md:grid-cols-2">
           {fields.map(([name, label]) => (
             <label className="field" key={name}>
@@ -118,7 +119,7 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
           <button className="btn btn-secondary" name="intent" value="draft" type="submit">Save Draft</button>
           <button className="btn btn-primary" name="intent" value="submit" type="submit">Submit for Review</button>
         </div>
-      </form>
+      </SellerApplicationForm>
       <SellerMediaManager initialMedia={profile.media.map((item) => ({
         id: item.id,
         mediaType: item.mediaType,

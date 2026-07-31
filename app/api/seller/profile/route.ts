@@ -8,7 +8,14 @@ import { queueNotification } from "@/lib/notifications";
 import { requireSameOrigin } from "@/lib/security";
 import { sellerProfileUpsertArgs } from "@/lib/seller-application";
 
-function validationRedirect(request: NextRequest, fields: string[]) {
+function wantsJson(request: NextRequest) {
+  return (request.headers.get("accept") ?? "").includes("application/json");
+}
+
+function validationResponse(request: NextRequest, fields: string[], draftSaved: boolean) {
+  if (wantsJson(request)) {
+    return NextResponse.json({ error: "validation", fields, draftSaved }, { status: 422 });
+  }
   const url = new URL("/seller/application", request.url);
   url.searchParams.set("submitError", "1");
   url.searchParams.set("fields", fields.join(","));
@@ -16,6 +23,7 @@ function validationRedirect(request: NextRequest, fields: string[]) {
 }
 
 function serverErrorRedirect(request: NextRequest) {
+  if (wantsJson(request)) return NextResponse.json({ error: "server" }, { status: 500 });
   const url = new URL("/seller/application", request.url);
   url.searchParams.set("submitError", "server");
   return NextResponse.redirect(url, 303);
@@ -44,16 +52,18 @@ export async function POST(request: NextRequest) {
       consentReview: body.consentReview === "on" || body.consentReview === "true",
       consentPublish: body.consentPublish === "on" || body.consentPublish === "true"
     });
+    let draftSaved = false;
     if (draftParsed.success) {
       const oldDraft = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
       try {
         await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, draftParsed.data, false, oldDraft?.applicationStatus, oldDraft?.submittedAt));
+        draftSaved = true;
       } catch (error) {
         console.error(error);
         return serverErrorRedirect(request);
       }
     }
-    return validationRedirect(request, Object.keys(parsed.error.flatten().fieldErrors));
+    return validationResponse(request, Object.keys(parsed.error.flatten().fieldErrors), draftSaved);
   }
   const oldProfile = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
   let profile;
@@ -67,5 +77,6 @@ export async function POST(request: NextRequest) {
   if (submit) {
     queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." }).catch(console.error);
   }
+  if (wantsJson(request)) return NextResponse.json({ ok: true, submitted: submit });
   return NextResponse.redirect(new URL(submit ? "/seller/application?submitted=1" : "/seller/dashboard", request.url), 303);
 }
