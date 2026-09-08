@@ -1,3 +1,4 @@
+import { mediaUrl } from "@/lib/media-url";
 import { NextRequest, NextResponse } from "next/server";
 import { ApplicationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -31,5 +32,5 @@ export async function GET(request: NextRequest) {
     take: Math.min(Number(params.get("take") ?? 24), 50),
     skip: Number(params.get("skip") ?? 0)
   });
-  return NextResponse.json({ sellers });
+  return NextResponse.json({ sellers: sellers.map((seller) => ({ ...seller, media: seller.media.map((item) => ({ ...item, fileUrl: mediaUrl(item), thumbnailUrl: mediaUrl(item, true) })) })) });
 }

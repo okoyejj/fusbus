@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import { mediaUrl } from "@/lib/media-url";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -36,6 +38,8 @@ function readableSize(bytes: number) {
 
 function messageForError(error: string) {
   const messages: Record<string, string> = {
+    unauthorized: "Your session expired. Sign in again before uploading.",
+    conflict: "Another image request changed your gallery. Please try again.",
     type: "Upload JPG, PNG, or WebP images only.",
     size: "Each image must be 6 MB or smaller.",
     count: "Product image uploads are limited to 5 total.",
@@ -59,14 +63,26 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
   const [uploadProgress, setUploadProgress] = useState(0);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
-  useEffect(() => setMedia(initialMedia), [initialMedia]);
-  useEffect(() => () => previewUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
+  const [previousMedia, setPreviousMedia] = useState(initialMedia);
+  if (previousMedia !== initialMedia) {
+    setPreviousMedia(initialMedia);
+    setMedia(initialMedia);
+  }
+  useEffect(() => {
+    const urls = previewUrls.current;
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
 
   const galleryCount = useMemo(() => media.filter((item) => item.mediaType === "GALLERY").length, [media]);
 
   function chooseFiles(type: MediaType, event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     setFeedback(null);
+    (selected[type] ?? []).forEach((item) => {
+      URL.revokeObjectURL(item.previewUrl);
+      previewUrls.current.delete(item.previewUrl);
+    });
+    setSelected((current) => ({ ...current, [type]: [] }));
     if (files.some((file) => file.type ? !allowedTypes.has(file.type) : !/\.(jpe?g|png|webp)$/i.test(file.name))) {
       setFeedback({ kind: "error", message: messageForError("type") });
       event.target.value = "";
@@ -189,7 +205,7 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
               </label>
               {files.length > 0 && <div className="grid grid-cols-2 gap-2" aria-label={`Selected ${section.title}`}>
                 {files.map((item, index) => <div className="relative overflow-hidden rounded-md border border-stone-200" key={`${item.file.name}-${item.file.lastModified}`}>
-                  <img className="aspect-[4/3] w-full object-cover" src={item.previewUrl} alt={`Selected ${item.file.name}`} />
+                  <Image unoptimized width={420} height={320} className="aspect-[4/3] w-full object-cover" src={item.previewUrl} alt={`Selected ${item.file.name}`} />
                   <button className="absolute right-1 top-1 rounded bg-white px-2 py-1 text-xs font-black text-red-700 shadow" type="button" onClick={() => removeSelection(section.type, index)} disabled={busy !== null}>Remove</button>
                   <p className="truncate px-2 py-1 text-xs">{item.file.name}</p>
                 </div>)}
@@ -206,7 +222,7 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
             <h3 className="font-black">{section.title}{section.type === "GALLERY" ? ` (${items.length}/5)` : ""}</h3>
             {items.length === 0 ? <p className="rounded-lg border border-dashed border-stone-300 p-4 text-sm text-stone-600">{section.empty}</p> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((item) => <div className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50" key={item.id}>
-                <img className="aspect-[4/3] w-full object-cover" src={item.thumbnailUrl ?? item.fileUrl} alt={item.originalFileName} />
+                <Image unoptimized width={420} height={320} className="aspect-[4/3] w-full object-cover" src={mediaUrl(item, true)} alt={item.originalFileName} />
                 <div className="grid gap-3 p-3">
                   <div className="min-w-0"><p className="truncate text-sm font-black text-stone-900">{item.originalFileName}</p><p className="text-xs text-stone-600">{readableSize(item.fileSize)} - {item.isPublic ? "Public" : "Private until approved"}</p></div>
                   <button className="btn btn-secondary w-full" type="button" onClick={() => remove(item)} disabled={busy !== null}>{busy === item.id ? "Removing..." : "Remove"}</button>

@@ -1,3 +1,4 @@
+import { mediaUrl } from "@/lib/media-url";
 import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -33,54 +34,54 @@ function serverErrorRedirect(request: NextRequest) {
 export async function GET() {
   const user = await requireUser(UserRole.SELLER);
   const profile = await prisma.sellerProfile.findUnique({ where: { userId: user.id }, include: { media: true } });
-  return NextResponse.json({ profile });
+  return NextResponse.json({ profile: profile ? { ...profile, media: profile.media.map((item) => ({ ...item, fileUrl: mediaUrl(item), thumbnailUrl: mediaUrl(item, true) })) } : null });
 }
 
 export async function POST(request: NextRequest) {
   const csrf = requireSameOrigin(request);
   if (csrf) return csrf;
   try {
-  const user = await requireUser(UserRole.SELLER);
-  const body = Object.fromEntries((await request.formData()).entries());
-  const submit = body.intent === "submit";
-  const parsed = (submit ? submitSellerSchema : sellerProfileSchema).safeParse({
-    ...body,
-    consentReview: body.consentReview === "on" || body.consentReview === "true",
-    consentPublish: body.consentPublish === "on" || body.consentPublish === "true"
-  });
-  if (!parsed.success) {
-    const draftParsed = sellerProfileSchema.safeParse({
+    const user = await requireUser(UserRole.SELLER);
+    const body = Object.fromEntries((await request.formData()).entries());
+    const submit = body.intent === "submit";
+    const parsed = (submit ? submitSellerSchema : sellerProfileSchema).safeParse({
       ...body,
       consentReview: body.consentReview === "on" || body.consentReview === "true",
       consentPublish: body.consentPublish === "on" || body.consentPublish === "true"
     });
-    let draftSaved = false;
-    if (draftParsed.success) {
-      const oldDraft = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
-      try {
-        await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, draftParsed.data, false, oldDraft?.applicationStatus, oldDraft?.submittedAt));
-        draftSaved = true;
-      } catch (error) {
-        console.error(error);
-        return serverErrorRedirect(request);
+    if (!parsed.success) {
+      const draftParsed = sellerProfileSchema.safeParse({
+        ...body,
+        consentReview: body.consentReview === "on" || body.consentReview === "true",
+        consentPublish: body.consentPublish === "on" || body.consentPublish === "true"
+      });
+      let draftSaved = false;
+      if (draftParsed.success) {
+        const oldDraft = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
+        try {
+          await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, draftParsed.data, false, oldDraft?.applicationStatus, oldDraft?.submittedAt));
+          draftSaved = true;
+        } catch (error) {
+          console.error(error);
+          return serverErrorRedirect(request);
+        }
       }
+      return validationResponse(request, parsed.error.flatten().fieldErrors, draftSaved);
     }
-    return validationResponse(request, parsed.error.flatten().fieldErrors, draftSaved);
-  }
-  const oldProfile = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
-  let profile;
-  try {
-    profile = await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, parsed.data, submit, oldProfile?.applicationStatus, oldProfile?.submittedAt));
-  } catch (error) {
-    console.error(error);
-    return serverErrorRedirect(request);
-  }
-  audit(request, { actorUserId: user.id, action: submit ? "SELLER_SUBMITTED" : "SELLER_DRAFT_SAVED", entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile }).catch(console.error);
-  if (submit) {
-    queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." }).catch(console.error);
-  }
-  if (wantsJson(request)) return NextResponse.json({ ok: true, submitted: submit });
-  return NextResponse.redirect(new URL(submit ? "/seller/application?submitted=1" : "/seller/dashboard", request.url), 303);
+    const oldProfile = await prisma.sellerProfile.findUnique({ where: { userId: user.id } });
+    let profile;
+    try {
+      profile = await prisma.sellerProfile.upsert(sellerProfileUpsertArgs(user.id, parsed.data, submit, oldProfile?.applicationStatus, oldProfile?.submittedAt));
+    } catch (error) {
+      console.error(error);
+      return serverErrorRedirect(request);
+    }
+    audit(request, { actorUserId: user.id, action: submit ? "SELLER_SUBMITTED" : "SELLER_DRAFT_SAVED", entityType: "SellerProfile", entityId: profile.id, oldValues: oldProfile, newValues: profile }).catch(console.error);
+    if (submit) {
+      queueNotification({ userId: user.id, type: "APPLICATION_SUBMITTED", subject: "Application submitted", message: "Your entrepreneur application has been submitted for review." }).catch(console.error);
+    }
+    if (wantsJson(request)) return NextResponse.json({ ok: true, submitted: submit });
+    return NextResponse.redirect(new URL(submit ? "/seller/application?submitted=1" : "/seller/dashboard", request.url), 303);
   } catch (error) {
     if ((error as { status?: number }).status === 401) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     if (error instanceof TypeError) return NextResponse.json({ error: "invalid" }, { status: 400 });

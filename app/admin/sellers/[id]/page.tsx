@@ -1,3 +1,4 @@
+import { mediaUrl } from "@/lib/media-url";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -83,7 +84,7 @@ export default async function SellerReviewPage({ params }: { params: Promise<{ i
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {orderedMedia.map((item) => (
               <div key={item.id}>
-                <Image src={item.thumbnailUrl ?? item.fileUrl} alt={item.originalFileName} width={420} height={320} className="aspect-[4/3] rounded-md object-cover" />
+                <Image unoptimized src={mediaUrl(item, true)} alt={item.originalFileName} width={420} height={320} className="aspect-[4/3] rounded-md object-cover" />
                 <p className="mt-1 text-xs text-stone-600">{item.mediaType} - {item.isPublic ? "public" : "private"}</p>
               </div>
             ))}

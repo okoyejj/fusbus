@@ -1,3 +1,4 @@
+import { mediaUrl } from "@/lib/media-url";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -11,7 +12,7 @@ type SellerCardProps = {
     category: string | null;
     shortSummary: string | null;
     isFeatured: boolean;
-    media?: { mediaType: string; fileUrl: string; thumbnailUrl: string | null; originalFileName: string }[];
+    media?: { id: string; mediaType: string; fileUrl: string; thumbnailUrl: string | null; originalFileName: string }[];
   };
 };
 
@@ -21,7 +22,7 @@ export function SellerCard({ seller }: SellerCardProps) {
     <article className="grid overflow-hidden rounded-lg border border-stone-200 bg-white shadow-soft">
       <div className="relative aspect-[4/3] bg-stone-100">
         {image ? (
-          <Image src={image.thumbnailUrl ?? image.fileUrl} alt={`${seller.businessName} entrepreneur profile`} fill className="object-cover" sizes="(min-width: 1024px) 33vw, 100vw" />
+          <Image unoptimized src={mediaUrl(image, true)} alt={`${seller.businessName} entrepreneur profile`} fill className="object-cover" sizes="(min-width: 1024px) 33vw, 100vw" />
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-green-50 via-white to-yellow-50 text-forest">
             <span className="text-4xl font-black">{seller.businessName.slice(0, 1)}</span>

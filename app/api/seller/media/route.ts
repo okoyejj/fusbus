@@ -3,12 +3,14 @@ import path from "node:path";
 import crypto from "node:crypto";
 import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
-import { MediaType, UserRole } from "@prisma/client";
+import { MediaType, UserRole, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { sanitizeFileName } from "@/lib/validation";
 import { audit } from "@/lib/audit";
-import { requireSameOrigin, resolveInside } from "@/lib/security";
+import { requireSameOrigin, resolveInside, rateLimit } from "@/lib/security";
+
+import { mediaStoragePath, sellerImageRoot } from "@/lib/media-storage";
 
 const maxGalleryImages = 5;
 
@@ -37,20 +39,19 @@ function serverError(request: NextRequest) {
   return mediaError(request, "server", 500);
 }
 
-async function deleteStoredFiles(items: Array<{ fileUrl: string; thumbnailUrl: string | null }>) {
-  const uploadRoot = path.resolve(process.env.UPLOAD_DIR ?? "./public/uploads");
-  await Promise.all(items.flatMap((item) => [item.fileUrl, item.thumbnailUrl].filter(Boolean).map(async (url) => {
-    const relativePath = String(url).replace(/^\/uploads\//, "");
-    const filePath = resolveInside(uploadRoot, relativePath);
-    await unlink(filePath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== "ENOENT") console.error(error);
+async function deleteStoredFiles(items: Array<{ sellerProfileId: string; storedFileName: string; fileUrl: string; thumbnailUrl: string | null }>) {
+  await Promise.all(items.flatMap((item) => [false, true].map(async (thumbnail) => {
+    // Seeded assets are not user uploads and must never be deleted.
+    if (!item.fileUrl.startsWith("/uploads/") && !item.fileUrl.startsWith("/api/media/")) return;
+    await unlink(mediaStoragePath(item, thumbnail)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") console.error("Unable to remove stored image");
     });
   })));
 }
 
 async function deleteMedia(request: NextRequest, id: string, user: Awaited<ReturnType<typeof requireUser>>) {
   const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id } });
-  const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { id: true, fileUrl: true, thumbnailUrl: true } });
+  const items = await prisma.sellerMedia.findMany({ where: { id, sellerProfileId: profile.id }, select: { id: true, sellerProfileId: true, storedFileName: true, fileUrl: true, thumbnailUrl: true } });
   if (items.length === 0) return mediaError(request, "missing", 404);
   await prisma.sellerMedia.deleteMany({ where: { id, sellerProfileId: profile.id } });
   deleteStoredFiles(items).catch(console.error);
@@ -60,18 +61,42 @@ async function deleteMedia(request: NextRequest, id: string, user: Awaited<Retur
 }
 
 export async function POST(request: NextRequest) {
+  const createdPaths: string[] = [];
+  let committed = false;
   try {
     const csrf = requireSameOrigin(request);
     if (csrf) return csrf;
     const user = await requireUser(UserRole.SELLER);
+    const limited = rateLimit(request, `media:${user.id}`, 30, 60_000);
+    if (limited) return limited;
     const contentLength = Number(request.headers.get("content-length") ?? 0);
     const maxRequestBytes = Number(process.env.MAX_UPLOAD_REQUEST_MB ?? 32) * 1024 * 1024;
     if (contentLength > maxRequestBytes) return mediaError(request, "request-size", 413);
-    const form = await request.formData();
+    // Count streamed bytes as well: Content-Length can be absent or dishonest.
+    if (!request.body) return mediaError(request, "missing");
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxRequestBytes) {
+        await reader.cancel();
+        return mediaError(request, "request-size", 413);
+      }
+      chunks.push(value);
+    }
+    let form: FormData;
+    try {
+      form = await new Response(Buffer.concat(chunks), { headers: { "content-type": request.headers.get("content-type") ?? "" } }).formData();
+    } catch {
+      return mediaError(request, "invalid");
+    }
     if (form.get("intent") === "delete") {
       const id = String(form.get("mediaId") ?? "");
       if (!id) return mediaError(request, "missing");
-      return deleteMedia(request, id, user);
+      return await deleteMedia(request, id, user);
     }
     const files = [...form.getAll("files"), ...form.getAll("file")].filter((item): item is File => item instanceof File && item.size > 0);
     const mediaType = String(form.get("mediaType") ?? "GALLERY") as MediaType;
@@ -87,77 +112,88 @@ export async function POST(request: NextRequest) {
       return mediaError(request, "count");
     }
 
-  const uploadRoot = path.resolve(process.env.UPLOAD_DIR ?? "./public/uploads");
-  const sellerDir = resolveInside(uploadRoot, profile.id);
-  await mkdir(sellerDir, { recursive: true });
+    const uploadRoot = sellerImageRoot();
+    const sellerDir = resolveInside(uploadRoot, profile.id);
+    await mkdir(sellerDir, { recursive: true });
 
-  const prepared: Array<{
-    sellerProfileId: string;
-    mediaType: MediaType;
-    originalFileName: string;
-    storedFileName: string;
-    fileUrl: string;
-    thumbnailUrl: string;
-    mimeType: string;
-    fileSize: number;
-    sortOrder: number;
-    isPublic: boolean;
-  }> = [];
-  for (const [index, file] of files.entries()) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const detectedType = detectedImageType(buffer);
-    if (!detectedType) return mediaError(request, "type");
-    const image = sharp(buffer);
-    const metadata = await image.metadata().catch(() => null);
-    if (!metadata?.width || !metadata.height) return mediaError(request, "invalid");
+    const prepared: Array<{
+      id: string;
+      sellerProfileId: string;
+      mediaType: MediaType;
+      originalFileName: string;
+      storedFileName: string;
+      fileUrl: string;
+      thumbnailUrl: string;
+      mimeType: string;
+      fileSize: number;
+      sortOrder: number;
+      isPublic: boolean;
+    }> = [];
+    for (const [index, file] of files.entries()) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const detectedType = detectedImageType(buffer);
+      if (!detectedType) return mediaError(request, "type");
+      const image = sharp(buffer, { limitInputPixels: 40_000_000, animated: false });
+      const metadata = await image.metadata().catch(() => null);
+      if (!metadata?.width || !metadata.height) return mediaError(request, "invalid");
 
-    const originalName = sanitizeFileName(file.name);
-    const unique = `${crypto.randomUUID()}-${originalName.replace(/\.[^.]+$/, "")}.webp`;
-    const thumb = `thumb-${unique}`;
-    const storedPath = path.join(sellerDir, unique);
-    const thumbPath = path.join(sellerDir, thumb);
+      const originalName = sanitizeFileName(file.name);
+      const unique = `${crypto.randomUUID()}-${originalName.replace(/\.[^.]+$/, "")}.webp`;
+      const thumb = `thumb-${unique}`;
+      const storedPath = path.join(sellerDir, unique);
+      const thumbPath = path.join(sellerDir, thumb);
+      createdPaths.push(storedPath, thumbPath);
 
-    const storedInfo = await sharp(buffer).resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 82 }).toFile(storedPath).catch(() => null);
-    if (!storedInfo) return mediaError(request, "invalid");
-    const thumbInfo = await sharp(buffer).resize({ width: 420, height: 320, fit: "cover" }).webp({ quality: 72 }).toFile(thumbPath).catch(() => null);
-    if (!thumbInfo) return mediaError(request, "invalid");
-    const fileUrl = `/uploads/${profile.id}/${unique}`;
-    const thumbnailUrl = `/uploads/${profile.id}/${thumb}`;
-    prepared.push({
-      sellerProfileId: profile.id,
-      mediaType,
-      originalFileName: originalName,
-      storedFileName: unique,
-      fileUrl,
-      thumbnailUrl,
-      mimeType: "image/webp",
-      fileSize: storedInfo.size,
-      sortOrder: mediaType === MediaType.GALLERY ? galleryCount + index : 0,
-      isPublic: false
-    });
-  }
-
-  const replaced = mediaType === MediaType.GALLERY
-    ? []
-    : profile.media.filter((item) => item.mediaType === mediaType).map((item) => ({ fileUrl: item.fileUrl, thumbnailUrl: item.thumbnailUrl }));
-
-  const uploaded = await prisma.$transaction(async (tx) => {
-    if (mediaType !== MediaType.GALLERY) {
-      await tx.sellerMedia.deleteMany({ where: { sellerProfileId: profile.id, mediaType } });
+      const storedInfo = await sharp(buffer, { limitInputPixels: 40_000_000, animated: false }).rotate().resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 82 }).toFile(storedPath).catch(() => null);
+      if (!storedInfo) return mediaError(request, "invalid");
+      const thumbInfo = await sharp(buffer, { limitInputPixels: 40_000_000, animated: false }).rotate().resize({ width: 420, height: 320, fit: "cover" }).webp({ quality: 72 }).toFile(thumbPath).catch(() => null);
+      if (!thumbInfo) return mediaError(request, "invalid");
+      const id = crypto.randomUUID();
+      const fileUrl = `/api/media/${id}`;
+      const thumbnailUrl = `${fileUrl}?thumbnail=1`;
+      prepared.push({
+        id,
+        sellerProfileId: profile.id,
+        mediaType,
+        originalFileName: originalName,
+        storedFileName: unique,
+        fileUrl,
+        thumbnailUrl,
+        mimeType: "image/webp",
+        fileSize: storedInfo.size,
+        sortOrder: mediaType === MediaType.GALLERY ? galleryCount + index : 0,
+        isPublic: false
+      });
     }
-    const records = [];
-    for (const data of prepared) {
-      records.push(await tx.sellerMedia.create({ data }));
-    }
-    return records;
-  });
-  if (replaced.length > 0) deleteStoredFiles(replaced).catch(console.error);
-  audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded }).catch(console.error);
-  if (wantsJson(request)) return NextResponse.json({ ok: true });
-  return NextResponse.redirect(new URL("/seller/application?mediaUploaded=1", request.url), 303);
+
+    const { uploaded, replaced } = await prisma.$transaction(async (tx) => {
+      const currentCount = await tx.sellerMedia.count({ where: { sellerProfileId: profile.id, mediaType: MediaType.GALLERY } });
+      if (mediaType === MediaType.GALLERY && currentCount + prepared.length > maxGalleryImages) {
+        throw Object.assign(new Error("Gallery limit reached"), { mediaError: "count" });
+      }
+      const replaced = mediaType === MediaType.GALLERY ? [] : await tx.sellerMedia.findMany({ where: { sellerProfileId: profile.id, mediaType } });
+      if (mediaType !== MediaType.GALLERY) {
+        await tx.sellerMedia.deleteMany({ where: { sellerProfileId: profile.id, mediaType } });
+      }
+      const records = [];
+      for (const data of prepared) {
+        records.push(await tx.sellerMedia.create({ data }));
+      }
+      return { uploaded: records, replaced };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    committed = true;
+    if (replaced.length > 0) deleteStoredFiles(replaced).catch(console.error);
+    audit(request, { actorUserId: user.id, action: "SELLER_MEDIA_UPLOADED", entityType: "SellerMedia", entityId: uploaded.map((media) => media.id).join(","), newValues: uploaded }).catch(console.error);
+    if (wantsJson(request)) return NextResponse.json({ ok: true });
+    return NextResponse.redirect(new URL("/seller/application?mediaUploaded=1", request.url), 303);
   } catch (error) {
-    console.error(error);
+    if ((error as { status?: number }).status === 401) return mediaError(request, "unauthorized", 401);
+    if ((error as { mediaError?: string }).mediaError === "count") return mediaError(request, "count");
+    if ((error as { code?: string }).code === "P2034") return mediaError(request, "conflict", 409);
+    console.error("Seller image upload failed");
     return serverError(request);
+  } finally {
+    if (!committed) await Promise.all(createdPaths.map((file) => unlink(file).catch(() => undefined)));
   }
 }
 
@@ -168,9 +204,10 @@ export async function DELETE(request: NextRequest) {
     const id = request.nextUrl.searchParams.get("id");
     if (!id) return mediaError(request, "missing");
     const user = await requireUser(UserRole.SELLER);
-    return deleteMedia(request, id, user);
+    return await deleteMedia(request, id, user);
   } catch (error) {
-    console.error(error);
+    if ((error as { status?: number }).status === 401) return mediaError(request, "unauthorized", 401);
+    console.error("Seller image deletion failed");
     return serverError(request);
   }
 }

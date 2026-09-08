@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
@@ -52,10 +53,18 @@ export async function getSessionUser() {
   const store = await cookies();
   const token = store.get(cookieName)?.value;
   if (!token) return null;
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature || (await sign(payload)) !== signature) return null;
-  const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as { userId: string; expiresAt: number };
-  if (parsed.expiresAt < Date.now()) return null;
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra !== undefined) return null;
+  const expected = Buffer.from(await sign(payload));
+  const received = Buffer.from(signature);
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) return null;
+  let parsed: { userId: string; expiresAt: number };
+  try {
+    parsed = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (!parsed || typeof parsed.userId !== "string" || !parsed.userId || !Number.isFinite(parsed.expiresAt) || parsed.expiresAt <= Date.now()) return null;
+  } catch {
+    return null;
+  }
   return prisma.user.findFirst({
     where: { id: parsed.userId, isActive: true, deletedAt: null },
     select: { id: true, email: true, role: true, emailVerified: true }

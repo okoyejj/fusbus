@@ -1,3 +1,4 @@
+import { mediaUrl } from "@/lib/media-url";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -23,9 +24,9 @@ export default async function SellerProfilePage({ params }: { params: Promise<{ 
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[.8fr_1.2fr] lg:px-8">
         <div className="grid gap-5">
           <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-stone-100">
-            {profileImage && <Image src={profileImage.fileUrl} alt={`${seller.businessName} entrepreneur profile`} fill className="object-cover" />}
+            {profileImage && <Image unoptimized src={mediaUrl(profileImage)} alt={`${seller.businessName} entrepreneur profile`} fill className="object-cover" />}
           </div>
-          {logo && <Image src={logo.thumbnailUrl ?? logo.fileUrl} alt={`${seller.businessName} logo`} width={80} height={80} className="h-20 w-20 rounded-md border border-stone-200 object-contain" />}
+          {logo && <Image unoptimized src={mediaUrl(logo, true)} alt={`${seller.businessName} logo`} width={80} height={80} className="h-20 w-20 rounded-md border border-stone-200 object-contain" />}
         </div>
         <div>
           <p className="text-sm font-black uppercase tracking-normal text-forest">{seller.sellerReferenceId}</p>
@@ -62,7 +63,7 @@ export default async function SellerProfilePage({ params }: { params: Promise<{ 
         <div className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-black">Business Gallery</h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {gallery.map((item) => <Image key={item.id} src={item.fileUrl} alt={item.originalFileName} width={640} height={480} className="aspect-[4/3] rounded-lg object-cover" />)}
+            {gallery.map((item) => <Image unoptimized key={item.id} src={mediaUrl(item)} alt={item.originalFileName} width={640} height={480} className="aspect-[4/3] rounded-lg object-cover" />)}
           </div>
         </div>
       )}
