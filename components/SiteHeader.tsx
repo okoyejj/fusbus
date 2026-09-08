@@ -18,9 +18,8 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
       <nav className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8" aria-label="Main navigation">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3 text-xl font-black leading-tight tracking-normal text-forest sm:gap-4 sm:text-2xl" onClick={() => setOpen(false)}>
-            <Image src="/brand/fusbus-logo.png" alt="FusBus logo" width={112} height={112} className="h-24 w-24 shrink-0 rounded-md object-contain sm:h-28 sm:w-28" priority />
-            <span className="min-w-0">FusBus Cameroon</span>
+          <Link href="/" className="flex min-w-0 items-center" aria-label="FusBus Cameroon home" onClick={() => setOpen(false)}>
+            <Image src="/brand/fusbus-logo.png" alt="FusBus" width={360} height={176} className="h-12 w-auto shrink-0 object-contain sm:h-14" priority />
           </Link>
 
           <button
