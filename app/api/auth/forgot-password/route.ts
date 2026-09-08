@@ -1,3 +1,4 @@
+import { createActionToken } from "@/lib/action-tokens";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { queueNotification } from "@/lib/notifications";
@@ -15,12 +16,12 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "").toLowerCase();
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
-  if (user) {
+  if (user && user.isActive && !user.deletedAt) {
     await queueNotification({
       userId: user.id,
       type: "PASSWORD_RESET_REQUEST",
       subject: "Password reset requested",
-      message: "A password reset was requested. Configure a tokenized email provider before production use."
+      message: `Your password reset token is ${createActionToken(user, "reset-password")}. It expires in 30 minutes and can only be used for this account.`
     });
   }
   return formRedirect(request, "/seller/login", { notice: "reset-requested" });

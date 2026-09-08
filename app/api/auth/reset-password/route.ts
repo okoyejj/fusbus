@@ -1,3 +1,4 @@
+import { verifyActionToken } from "@/lib/action-tokens";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
@@ -17,9 +18,10 @@ export async function POST(request: NextRequest) {
   const email = String(form.get("email") ?? "").toLowerCase();
   const token = String(form.get("token") ?? "");
   const password = String(form.get("password") ?? "");
-  const expectedToken = process.env.RESET_PASSWORD_TOKEN;
+  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   const parsed = passwordSchema.safeParse(password);
-  if (!email || !expectedToken || token !== expectedToken || !parsed.success) return formError(request, "/seller/login", "reset-invalid", "That password reset link is invalid or expired.");
-  await prisma.user.update({ where: { email }, data: { passwordHash: await hashPassword(password), failedLogins: 0, lockedUntil: null } });
+  if (!email || !user || !user.isActive || user.deletedAt || !verifyActionToken(token, user, "reset-password") || !parsed.success) return formError(request, "/seller/login", "reset-invalid", "That password reset link is invalid or expired.");
+  const changed = await prisma.user.updateMany({ where: { id: user.id, passwordHash: user.passwordHash }, data: { passwordHash: await hashPassword(password), failedLogins: 0, lockedUntil: null } });
+  if (changed.count !== 1) return formError(request, "/seller/login", "reset-invalid", "That password reset link is invalid or expired.");
   return formRedirect(request, "/seller/login", { notice: "password-reset" });
 }

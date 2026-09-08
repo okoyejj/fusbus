@@ -1,3 +1,4 @@
+import { createActionToken } from "@/lib/action-tokens";
 import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     type: "SELLER_REGISTRATION",
     subject: "Welcome to FusBus Cameroon",
-    message: "Your entrepreneur account has been created. Please complete your onboarding application."
+    message: `Your entrepreneur account has been created. Please complete your onboarding application. Your email verification token is ${createActionToken(user, "verify-email")}; it expires in 30 minutes.`
   }).catch(console.error);
   await createSession(user.id);
   return NextResponse.redirect(new URL("/seller/application", publicOrigin(request)), 303);

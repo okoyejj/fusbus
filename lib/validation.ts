@@ -42,7 +42,8 @@ export const passwordSchema = z
   .min(10)
   .regex(/[A-Z]/, "Add an uppercase letter")
   .regex(/[a-z]/, "Add a lowercase letter")
-  .regex(/[0-9]/, "Add a number");
+  .regex(/[0-9]/, "Add a number")
+  .refine((value) => new TextEncoder().encode(value).length <= 72, "Use a password of at most 72 UTF-8 bytes.");
 
 export const registerSchema = z.object({
   email: z.string().email(),
