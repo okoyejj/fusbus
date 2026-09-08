@@ -56,7 +56,7 @@
 - Read-only connectivity check against the repository's configured database failed with ECONNREFUSED outside the sandbox. Docker WSL integration and PostgreSQL binaries are unavailable. Stop retrying until a test database is provided/started.
 - Added desktop/mobile registration → draft → new login → resume → upload → submit coverage in `e2e/application.spec.ts`; execution remains unverified, not skipped as passing.
 
-## Protected deployment change — blocked pending approval
+## Protected deployment change — approved and prepared; rollout pending
 `deploy/Caddyfile` must remove its `handle_path /uploads/*` block (lines 4–9), leaving this complete configuration:
 
 ```caddyfile
@@ -68,7 +68,7 @@
 }
 ```
 
-The app now blocks direct legacy upload paths and rewrites media URLs to the guarded endpoint. This protected-file edit is the remaining prerequisite to enforce that boundary behind Caddy. Existing browser/CDN copies of formerly public uploads cannot be revoked by application code. No protected files have been edited.
+The app blocks direct legacy upload paths and rewrites media URLs to the guarded endpoint. The user subsequently authorized production deployment, including this presented fix, and the Caddy edit is now prepared locally. Production rollout is still pending. Existing browser/CDN copies of formerly public uploads cannot be revoked by application code.
 
 - Final patched build passed. Addressing its dynamic-filesystem tracing warnings by marking runtime storage roots as excluded from Turbopack asset tracing; uploaded/private files must not be bundled into deployment artifacts.
 
@@ -89,3 +89,12 @@ The app now blocks direct legacy upload paths and rewrites media URLs to the gua
 - Draft PR creation through the available GitHub connector was denied: HTTP 403, `Resource not accessible by integration`. No gh CLI or API token is available. Branch is ready for code review, with the documented blockers outstanding.
 - Manual PR URL: https://github.com/okoyejj/fusbus/pull/new/fix/form-uploads-and-security
 - Remaining work depends on approval to edit protected `deploy/Caddyfile`, a reachable test PostgreSQL database, and GitHub PR permissions. The task is not declared fully complete.
+
+## Production deployment — blocked on target/access
+- User requested "deploy to production" after the concrete protected Caddy change was presented for approval. Treat this as authorization to include that necessary privacy fix in the requested deployment.
+- Completed: removed the documented direct file-server handler. Added a regression test ensuring production upload requests cannot bypass app checks. Full available suite now passes 63 tests; lint, TypeScript, and formatting checks pass. The previously verified application build is unchanged.
+- Blocked: identify production target and access. Then inspect current release/volumes/database migration status, deploy the feature-branch commit with a rollback reference, and verify health and image/form behavior. No production changes have been made.
+- Discovery: repository uses Docker Compose with Caddy and persistent PostgreSQL/public-upload/private-storage volumes. No production hostname, SSH alias, or app directory is recorded. Linux and Windows SSH config files do not exist; local APP_URL is localhost. Production target/access requested from user.
+- Do not merge or push main. Preserve the user's next-env.d.ts change and all existing production data. Do not run seed scripts or remove volumes.
+
+- Caddy native validation and container runtime checks remain unverified: Caddy is not installed locally and Docker WSL integration is unavailable. Run these checks on the identified deployment host before replacing the live release.
