@@ -14,7 +14,7 @@
 1. **Completed:** draft persistence, database-compatible validation, save-error recovery, request/session protections, image upload/serving/access control, and regression tests.
 2. **Completed:** preserve the existing header change and verify the supplied logo byte-for-byte and as a decodable PNG.
 3. **Completed except blocked browser suite:** formatting check, lint, TypeScript, 62 unit/component/route tests, unchanged coverage thresholds, production build, and dependency audit.
-4. **Active:** commit final changes and attempt feature-branch push; open a PR only if credentials/tooling allow it.
+4. **Completed:** all task changes committed and feature branch pushed. **Blocked:** PR creation denied by GitHub integration permissions.
 
 ## Constraints and decisions
 - Do not modify migrations, environment files, CI, or production infrastructure without documenting the need and obtaining approval.
@@ -39,7 +39,7 @@
 ## Validation progress
 - Dependency repair: in-place npm install failed on DNS, then npm internal `edgesOut`; third repair strategy succeeded using locked `npm ci` in `/tmp/fusbus-checks`. Initial checks used unchanged locked versions. A later security audit found six high-severity dependency findings; compatible security patch updates are necessary and being applied without force upgrades or new direct dependencies.
 - Prisma generation encountered a read-only global cache, then silently produced no client with explicit engine paths. Reused the repository's existing generated client from this repository (fresh generation later succeeded) and Linux engine for isolated tests. An escalated build subsequently generated the client successfully and passed the production build.
-- Current isolated checks: 56 tests pass, ESLint passes without warnings, TypeScript passes. Existing coverage thresholds remain unchanged.
+- Intermediate isolated checks: 56 tests passed; final results below supersede this count. ESLint and TypeScript passed. Existing coverage thresholds remain unchanged.
 - No standalone formatter is configured; use existing style plus `git diff --check` via `format:check`.
 - Docker is unavailable in this WSL distribution, and no local PostgreSQL binary was found. Real database-backed browser validation may require external access.
 
@@ -73,7 +73,7 @@ The app now blocks direct legacy upload paths and rewrites media URLs to the gua
 - Final patched build passed. Addressing its dynamic-filesystem tracing warnings by marking runtime storage roots as excluded from Turbopack asset tracing; uploaded/private files must not be bundled into deployment artifacts.
 
 ## Final validation
-- Validation ran against a synchronized source copy in `/tmp/fusbus-checks` using Linux dependencies installed from the committed lockfile. The workspace's pre-existing Windows node_modules was preserved; run npm ci on the target OS before using the updated lockfile.
+- Validation ran against a synchronized source copy in `/tmp/fusbus-checks` using Linux dependencies installed from the committed lockfile. The workspace's pre-existing Windows node_modules was not replaced with the temporary Linux install; run npm ci on the target OS before using the updated lockfile.
 - `npm test`: **62 tests passed**, 11 files. Existing four-file coverage scope and 80% thresholds unchanged; measured lines/statements/functions 100%, branches 94.54%. New route/security/component tests also run, but are outside that pre-existing percentage scope.
 - `npm run lint`: **passed**, no warnings.
 - `npm run typecheck`: **passed**.
@@ -83,3 +83,9 @@ The app now blocks direct legacy upload paths and rewrites media URLs to the gua
 - `npm run test:e2e`: **blocked**, configured PostgreSQL connection refused; new full workflow test has not executed. No tests weakened or removed.
 - Notification email delivery and deployed reverse-proxy behavior: **unverified**, require external integration/deployment. In-process rate limits remain per server instance, as in the existing architecture.
 - Protected paths unchanged. Original `next-env.d.ts` user modification remains unstaged and uncommitted.
+
+## Review handoff
+- Pushed `fix/form-uploads-and-security` to `origin`; main was not changed or merged.
+- Draft PR creation through the available GitHub connector was denied: HTTP 403, `Resource not accessible by integration`. No gh CLI or API token is available. Branch is ready for code review, with the documented blockers outstanding.
+- Manual PR URL: https://github.com/okoyejj/fusbus/pull/new/fix/form-uploads-and-security
+- Remaining work depends on approval to edit protected `deploy/Caddyfile`, a reachable test PostgreSQL database, and GitHub PR permissions. The task is not declared fully complete.
