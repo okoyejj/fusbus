@@ -98,3 +98,11 @@ The app blocks direct legacy upload paths and rewrites media URLs to the guarded
 - Do not merge or push main. Preserve the user's next-env.d.ts change and all existing production data. Do not run seed scripts or remove volumes.
 
 - Caddy native validation and container runtime checks remain unverified: Caddy is not installed locally and Docker WSL integration is unavailable. Run these checks on the identified deployment host before replacing the live release.
+
+## AWS production deployment — blocked on SSO login
+- User specified AWS as the deployment provider. AWS CLI and an existing `fusbus-admin` SSO profile are available; its configured service region is `us-east-1` and SSO region is `eu-north-1`.
+- Default AWS credentials fail STS identity verification with `InvalidClientTokenId`.
+- FusBus SSO initially failed certificate loading because the profile contains a Windows CA path. The existing CA bundle is accessible at `/mnt/c/tmp/awscli-ca-bundle.pem`; a per-command AWS_CA_BUNDLE override fixes the internal SSO request without disabling TLS checks or changing AWS configuration files.
+- Certificate troubleshooting: first escalated request failed on the nonexistent Windows path; explicit --ca-bundle fixed only the outer request; AWS_CA_BUNDLE fixed the internal refresh request. The resulting error is an expired SSO token that cannot refresh.
+- Started `aws sso login --profile fusbus-admin --use-device-code --no-browser` and requested browser sign-in from the user. No AWS resources have been modified, and production remains undeployed.
+- After login: verify account identity; locate existing FusBus resources in the configured region; inspect the current deployment and data volumes; validate Caddy/container configuration; deploy the reviewed feature commit with rollback available; verify live health, form and image behavior. Do not merge or push main.
