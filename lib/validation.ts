@@ -3,7 +3,7 @@ import { z } from "zod";
 const blankToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
 const optionalText = (max: number) => z.preprocess(blankToNull, z.string().trim().max(max, `Use ${max} characters or fewer.`).nullable().optional());
 const optionalNumber = (max: number) => z.preprocess(blankToNull, z.coerce.number().int().min(0).max(max).nullable().optional());
-const optionalMoney = z.preprocess(blankToNull, z.coerce.number().nonnegative().nullable().optional());
+const optionalMoney = z.preprocess(blankToNull, z.coerce.number().finite().nonnegative().max(9999999999.99, "Funding must be 9,999,999,999.99 or less.").multipleOf(0.01, "Use at most two decimal places.").nullable().optional());
 const optionalUrl = z.preprocess(blankToNull, z.string().trim().max(500, "Use 500 characters or fewer.").url("Enter a complete URL, including https://").nullable().optional());
 
 export const businessStages = [
@@ -79,8 +79,8 @@ export const sellerProfileSchema = z.object({
   supportNeeded: optionalText(500),
   fundingAmount: optionalMoney,
   useOfFunds: optionalText(2000),
-  consentReview: z.coerce.boolean(),
-  consentPublish: z.coerce.boolean()
+  consentReview: z.boolean(),
+  consentPublish: z.boolean()
 });
 
 export const submitSellerSchema = sellerProfileSchema.extend({

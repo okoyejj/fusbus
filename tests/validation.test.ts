@@ -72,3 +72,15 @@ describe("file upload validation helpers", () => {
     expect(allowedImageTypes.includes("application/x-msdownload" as never)).toBe(false);
   });
 });
+
+describe("database-compatible funding and explicit consent", () => {
+  it.each(["0", "12.34", "9999999999.99", ""])("accepts valid funding %s", (fundingAmount) => {
+    expect(sellerProfileSchema.partial().safeParse({ fundingAmount }).success).toBe(true);
+  });
+  it.each(["10000000000", "1.001", "Infinity", "-1"])("rejects invalid funding %s", (fundingAmount) => {
+    expect(sellerProfileSchema.partial().safeParse({ fundingAmount }).success).toBe(false);
+  });
+  it("does not interpret a false string as consent", () => {
+    expect(sellerProfileSchema.partial().safeParse({ consentPublish: "false" }).success).toBe(false);
+  });
+});

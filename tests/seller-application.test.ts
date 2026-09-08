@@ -1,6 +1,6 @@
 import { ApplicationStatus, Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { sellerProfilePersistenceData, sellerProfileUpsertArgs } from "@/lib/seller-application";
+import { sellerProfilePersistenceData, sellerProfileUpsertArgs, socialLinksFormValue } from "@/lib/seller-application";
 
 const draft = {
   fullName: "Valid Seller",
@@ -62,5 +62,20 @@ describe("seller application persistence", () => {
     const resubmittedReview = sellerProfileUpsertArgs("user-1", draft, true, ApplicationStatus.UNDER_REVIEW, null);
     expect(resubmittedReview.update.applicationStatus).toBe(ApplicationStatus.UNDER_REVIEW);
     expect(resubmittedReview.update.submittedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("reopening social links", () => {
+  it("preserves text across repeated save and reopen cycles", () => {
+    let links = "https://example.com/profile";
+    for (let i = 0; i < 5; i++) {
+      links = socialLinksFormValue(sellerProfilePersistenceData({ ...draft, socialLinks: links }).socialLinks);
+      expect(links).toBe("https://example.com/profile");
+    }
+  });
+  it("handles empty and legacy JSON values", () => {
+    expect(socialLinksFormValue(null)).toBe("");
+    expect(socialLinksFormValue("legacy text")).toBe("legacy text");
+    expect(socialLinksFormValue({ facebook: "link" })).toBe('{"facebook":"link"}');
   });
 });

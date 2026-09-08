@@ -71,11 +71,14 @@ export function SellerApplicationForm({ children }: { children: ReactNode }) {
             const control = form.elements.namedItem(field);
             if (control instanceof HTMLElement) control.setAttribute("aria-invalid", "true");
           });
+        } else if (response.status === 401) {
+          setFeedback("Your session expired. Sign in again in another tab, then save this form. Your entries remain here.");
         } else {
           setFeedback("Your application could not be saved. Your entries remain in the form; please try again.");
         }
         return;
       }
+      router.refresh();
       router.push(result.submitted ? "/seller/application?submitted=1" : "/seller/dashboard");
     } catch (error) {
       setFeedback(error instanceof DOMException && error.name === "AbortError"

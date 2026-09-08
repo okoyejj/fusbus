@@ -61,3 +61,11 @@ export function sellerProfileUpsertArgs(userId: string, data: SellerProfileFormD
     }
   };
 }
+
+// Older drafts store links in a JSON object. Return the original text when editing.
+export function socialLinksFormValue(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "raw" in value && typeof value.raw === "string") return value.raw;
+  return JSON.stringify(value);
+}

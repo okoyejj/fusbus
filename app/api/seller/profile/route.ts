@@ -39,6 +39,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const csrf = requireSameOrigin(request);
   if (csrf) return csrf;
+  try {
   const user = await requireUser(UserRole.SELLER);
   const body = Object.fromEntries((await request.formData()).entries());
   const submit = body.intent === "submit";
@@ -80,4 +81,11 @@ export async function POST(request: NextRequest) {
   }
   if (wantsJson(request)) return NextResponse.json({ ok: true, submitted: submit });
   return NextResponse.redirect(new URL(submit ? "/seller/application?submitted=1" : "/seller/dashboard", request.url), 303);
+  } catch (error) {
+    if ((error as { status?: number }).status === 401) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (error instanceof TypeError) return NextResponse.json({ error: "invalid" }, { status: 400 });
+    console.error("Seller profile save failed");
+    return serverErrorRedirect(request);
+  }
+
 }
