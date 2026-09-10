@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { detectedImageType } from "@/lib/image-content";
 import { prisma } from "@/lib/prisma";
 import { mediaStoragePath } from "@/lib/media-storage";
 
@@ -18,9 +19,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!user || (user.role !== "ADMIN" && user.id !== profile.userId)) return unavailable();
   }
   try {
-    const bytes = await readFile(mediaStoragePath(media, request.nextUrl.searchParams.get("thumbnail") === "1"));
-    return new NextResponse(bytes, { headers: {
-      "Content-Type": "image/webp",
+    const thumbnail = request.nextUrl.searchParams.get("thumbnail") === "1";
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(mediaStoragePath(media, thumbnail));
+    } catch (error) {
+      if (!thumbnail || (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      bytes = await readFile(mediaStoragePath(media));
+    }
+    const contentType = detectedImageType(bytes);
+    if (!contentType) return unavailable();
+    return new NextResponse(new Uint8Array(bytes), { headers: {
+      "Content-Type": contentType,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff"
     } });

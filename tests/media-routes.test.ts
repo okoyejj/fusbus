@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -74,6 +74,30 @@ describe("image upload and access", () => {
     expect((await getImage()).status).toBe(200);
     record.sellerProfile = { ...profile, applicationStatus: "SUSPENDED" };
     expect((await getImage()).status).toBe(404);
+  });
+  it("falls back to a legacy original and reports its real type when the thumbnail is missing", async () => {
+    const legacyRoot = path.join(root, "legacy-uploads");
+    const sellerRoot = path.join(legacyRoot, "profile");
+    const png = await sharp({ create: { width: 20, height: 10, channels: 3, background: "blue" } }).png().toBuffer();
+    await mkdir(sellerRoot, { recursive: true });
+    await writeFile(path.join(sellerRoot, "photo.png"), png);
+    vi.stubEnv("UPLOAD_DIR", legacyRoot);
+    record = {
+      id: "image",
+      sellerProfileId: "profile",
+      storedFileName: "photo.png",
+      fileUrl: "/uploads/profile/photo.png",
+      thumbnailUrl: "/uploads/profile/missing-thumb.png",
+      mimeType: "image/webp",
+      isPublic: true,
+      sellerProfile: { ...profile, applicationStatus: "APPROVED" }
+    };
+    mocks.getSessionUser.mockResolvedValue(null);
+
+    const response = await getImage(true);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect((await sharp(Buffer.from(await response.arrayBuffer())).metadata()).format).toBe("png");
   });
   it("removes partial files when a later image has forged MIME content", async () => {
     const png = await sharp({ create: { width: 10, height: 10, channels: 3, background: "red" } }).png().toBuffer();
