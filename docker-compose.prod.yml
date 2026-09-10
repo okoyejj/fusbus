@@ -24,6 +24,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-fusbus}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fusbus}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
       APP_URL: ${APP_URL:?APP_URL is required}
+      PAYPAL_PAYMENT_URL: ${PAYPAL_PAYMENT_URL:-}
       EMAIL_FROM: ${EMAIL_FROM:-FusBus <no-reply@example.com>}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
