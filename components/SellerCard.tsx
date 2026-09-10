@@ -18,11 +18,14 @@ type SellerCardProps = {
 
 export function SellerCard({ seller }: SellerCardProps) {
   const image = seller.media?.find((item) => item.mediaType === "PROFILE") ?? seller.media?.[0];
+  const profileHref = `/sellers/${seller.id}`;
   return (
     <article className="grid overflow-hidden rounded-lg border border-stone-200 bg-white shadow-soft">
       <div className="relative aspect-[4/3] bg-stone-100">
         {image ? (
-          <Image unoptimized src={mediaUrl(image, true)} alt={`${seller.businessName} entrepreneur profile`} fill className="object-cover" sizes="(min-width: 1024px) 33vw, 100vw" />
+          <Link href={profileHref} aria-label={`View ${seller.businessName} profile`} className="block h-full focus:outline-none focus-visible:ring-4 focus-visible:ring-gold">
+            <Image unoptimized src={mediaUrl(image, true)} alt={`${seller.businessName} entrepreneur profile`} fill className="object-cover transition-transform duration-200 hover:scale-105" sizes="(min-width: 1024px) 33vw, 100vw" />
+          </Link>
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-green-50 via-white to-yellow-50 text-forest">
             <span className="text-4xl font-black">{seller.businessName.slice(0, 1)}</span>
@@ -40,7 +43,7 @@ export function SellerCard({ seller }: SellerCardProps) {
         </div>
         <p className="line-clamp-3 text-sm leading-6 text-stone-700">{seller.shortSummary}</p>
         <p className="text-xs font-bold uppercase tracking-normal text-stone-500">Entrepreneur ref: {seller.sellerReferenceId}</p>
-        <Link className="btn btn-primary" href={`/sellers/${seller.id}`}>
+        <Link className="btn btn-primary" href={profileHref}>
           View Profile
         </Link>
       </div>
