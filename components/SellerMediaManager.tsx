@@ -28,7 +28,7 @@ const sections: Array<{ type: MediaType; title: string; empty: string; multiple:
   { type: "GALLERY", title: "Product images", empty: "No product images uploaded yet.", multiple: true }
 ];
 
-const maxFileBytes = 6 * 1024 * 1024;
+const maxFileBytes = 5 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 
 function readableSize(bytes: number) {
@@ -41,7 +41,7 @@ function messageForError(error: string) {
     unauthorized: "Your session expired. Sign in again before uploading.",
     conflict: "Another image request changed your gallery. Please try again.",
     type: "Upload JPG, PNG, or WebP images only.",
-    size: "Each image must be 6 MB or smaller.",
+    size: "Image too large. Each image must be 5 MB or smaller.",
     count: "Product image uploads are limited to 5 total.",
     single: "Choose one image for a profile picture or business logo.",
     invalid: "One or more images could not be processed.",
@@ -202,10 +202,19 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
               <label className="field">
                 <span className="label">{section.title}</span>
                 <input ref={(element) => { inputRefs.current[section.type] = element; }} className="input" type="file" accept="image/jpeg,image/png,image/webp" multiple={section.multiple} onChange={(event) => chooseFiles(section.type, event)} disabled={busy !== null} />
+                <span className="text-xs text-stone-600">JPG, PNG, or WebP. 5 MB maximum; uploaded images are compressed below 1 MB.</span>
               </label>
               {files.length > 0 && <div className="grid grid-cols-2 gap-2" aria-label={`Selected ${section.title}`}>
                 {files.map((item, index) => <div className="relative overflow-hidden rounded-md border border-stone-200" key={`${item.file.name}-${item.file.lastModified}`}>
-                  <Image unoptimized width={420} height={320} className="aspect-[4/3] w-full object-cover" src={item.previewUrl} alt={`Selected ${item.file.name}`} />
+                  <div className="relative">
+                    <Image unoptimized width={420} height={320} className="aspect-[4/3] w-full object-cover" src={item.previewUrl} alt={`Selected ${item.file.name}`} />
+                    {busy === section.type && uploadProgress === index && <div className="absolute inset-0 grid place-items-center bg-black/55 text-white" role="status" aria-label={`Processing ${item.file.name}`}>
+                      <div className="grid justify-items-center gap-2">
+                        <span className="h-9 w-9 animate-spin rounded-full border-4 border-white/40 border-t-white" aria-hidden="true" />
+                        <span className="text-xs font-bold">Processing image...</span>
+                      </div>
+                    </div>}
+                  </div>
                   <button className="absolute right-1 top-1 rounded bg-white px-2 py-1 text-xs font-black text-red-700 shadow" type="button" onClick={() => removeSelection(section.type, index)} disabled={busy !== null}>Remove</button>
                   <p className="truncate px-2 py-1 text-xs">{item.file.name}</p>
                 </div>)}

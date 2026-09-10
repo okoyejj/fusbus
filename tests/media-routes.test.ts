@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -56,6 +57,23 @@ describe("image upload and access", () => {
       expect(response.headers.get("cache-control")).toBe("private, no-store");
       expect((await sharp(Buffer.from(await response.arrayBuffer())).metadata()).format).toBe("webp");
     }
+  });
+  it("compresses a complex accepted image below 1 MB", async () => {
+    const width = 1400;
+    const source = await sharp(randomBytes(width * width * 3), { raw: { width, height: width, channels: 3 } }).jpeg({ quality: 100 }).toBuffer();
+    expect(source.byteLength).toBeGreaterThan(1_000_000);
+    expect(source.byteLength).toBeLessThanOrEqual(5 * 1024 * 1024);
+
+    expect((await upload([new File([source], "large-photo.jpg", { type: "image/jpeg" })])).status).toBe(200);
+    expect(record.fileSize).toBeLessThan(1_000_000);
+  });
+  it("rejects an image above 5 MB with the image-too-large error", async () => {
+    const tooLarge = new File([Buffer.alloc(5 * 1024 * 1024 + 1)], "too-large.jpg", { type: "image/jpeg" });
+    const response = await upload([tooLarge]);
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: "size" });
+    expect(mocks.create).not.toHaveBeenCalled();
   });
   it("denies anonymous users and other sellers but permits admins", async () => {
     await upload();

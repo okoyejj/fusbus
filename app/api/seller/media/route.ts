@@ -1,4 +1,4 @@
-import { mkdir, unlink } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import sharp from "sharp";
@@ -9,11 +9,13 @@ import { requireUser } from "@/lib/auth";
 import { sanitizeFileName } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 import { detectedImageType } from "@/lib/image-content";
+import { compressImageBelowLimit } from "@/lib/image-compression";
 import { requireSameOrigin, resolveInside, rateLimit } from "@/lib/security";
 
 import { mediaStoragePath, sellerImageRoot } from "@/lib/media-storage";
 
 const maxGalleryImages = 5;
+const absoluteMaxInputImageMb = 5;
 
 function mediaError(request: NextRequest, reason: string, status = 400) {
   const accept = request.headers.get("accept") ?? "";
@@ -97,8 +99,9 @@ export async function POST(request: NextRequest) {
     if (!Object.values(MediaType).includes(mediaType)) return mediaError(request, "type");
     if (files.length === 0) return mediaError(request, "missing");
     if (mediaType !== MediaType.GALLERY && files.length > 1) return mediaError(request, "single");
-    const maxBytes = Number(process.env.MAX_UPLOAD_MB ?? 6) * 1024 * 1024;
-    if (files.some((file) => file.size > maxBytes)) return mediaError(request, "size");
+    const configuredMaxInputMb = Number(process.env.MAX_UPLOAD_MB ?? absoluteMaxInputImageMb);
+    const maxInputImageBytes = Math.min(Number.isFinite(configuredMaxInputMb) && configuredMaxInputMb > 0 ? configuredMaxInputMb : absoluteMaxInputImageMb, absoluteMaxInputImageMb) * 1024 * 1024;
+    if (files.some((file) => file.size > maxInputImageBytes)) return mediaError(request, "size", 413);
 
     const profile = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: user.id }, include: { media: true } });
     const galleryCount = profile.media.filter((item) => item.mediaType === MediaType.GALLERY).length;
@@ -138,8 +141,9 @@ export async function POST(request: NextRequest) {
       const thumbPath = path.join(sellerDir, thumb);
       createdPaths.push(storedPath, thumbPath);
 
-      const storedInfo = await sharp(buffer, { limitInputPixels: 40_000_000, animated: false }).rotate().resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 82 }).toFile(storedPath).catch(() => null);
-      if (!storedInfo) return mediaError(request, "invalid");
+      const storedBuffer = await compressImageBelowLimit(buffer).catch(() => null);
+      if (!storedBuffer) return mediaError(request, "invalid");
+      await writeFile(storedPath, storedBuffer);
       const thumbInfo = await sharp(buffer, { limitInputPixels: 40_000_000, animated: false }).rotate().resize({ width: 420, height: 320, fit: "cover" }).webp({ quality: 72 }).toFile(thumbPath).catch(() => null);
       if (!thumbInfo) return mediaError(request, "invalid");
       const id = crypto.randomUUID();
@@ -154,7 +158,7 @@ export async function POST(request: NextRequest) {
         fileUrl,
         thumbnailUrl,
         mimeType: "image/webp",
-        fileSize: storedInfo.size,
+        fileSize: storedBuffer.byteLength,
         sortOrder: mediaType === MediaType.GALLERY ? galleryCount + index : 0,
         isPublic: false
       });
