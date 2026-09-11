@@ -1,6 +1,9 @@
 {$CADDY_SITE_ADDRESS} {
   encode gzip zstd
 
+  @www host www.fusbus.org
+  redir @www https://fusbus.org{uri} permanent
+
   handle {
     reverse_proxy app:3000
   }
