@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
 import { registerSchema } from "@/lib/validation";
 import { queueNotification } from "@/lib/notifications";
-import { formError, formRedirect, publicOrigin, rateLimit, requireSameOrigin } from "@/lib/security";
+import { formError, formRedirect, publicOrigin, rateLimit, requireSameOrigin, wantsHtml } from "@/lib/security";
 
 export function GET(request: NextRequest) {
   return formRedirect(request, "/seller/register", { error: "method" });
@@ -18,7 +18,14 @@ export async function POST(request: NextRequest) {
   if (limited) return formError(request, "/seller/register", "limited", "Too many registration attempts. Please wait and try again.", 429);
   const body = Object.fromEntries((await request.formData()).entries());
   const parsed = registerSchema.safeParse(body);
-  if (!parsed.success) return formError(request, "/seller/register", "invalid", "Please check the registration form and try again.");
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}:${issue.message}`)
+      .slice(0, 4)
+      .join("|");
+    if (wantsHtml(request)) return formRedirect(request, "/seller/register", { error: "invalid", details });
+    return NextResponse.json({ error: "Please check the registration form and try again.", details: parsed.error.flatten().fieldErrors }, { status: 400 });
+  }
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
   if (existing) return formError(request, "/seller/register", "exists", "An account already exists for that email address.", 409);
 

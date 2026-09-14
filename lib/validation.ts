@@ -46,10 +46,10 @@ export const passwordSchema = z
   .refine((value) => new TextEncoder().encode(value).length <= 72, "Use a password of at most 72 UTF-8 bytes.");
 
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   password: passwordSchema,
-  fullName: z.string().min(2).max(120),
-  businessName: z.string().min(2).max(140)
+  fullName: z.string().trim().min(2).max(120),
+  businessName: z.string().trim().min(2).max(140)
 });
 
 export const loginSchema = z.object({

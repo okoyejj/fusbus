@@ -1,7 +1,25 @@
 import Link from "next/link";
 
-export default async function SellerRegisterPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+const fieldLabels: Record<string, string> = {
+  email: "Email address",
+  password: "Password",
+  fullName: "Full name",
+  businessName: "Business or trading name"
+};
+
+function validationDetails(details?: string) {
+  return details
+    ?.split("|")
+    .map((detail) => {
+      const [field, ...message] = detail.split(":");
+      return `${fieldLabels[field] ?? field}: ${message.join(":")}`;
+    })
+    .filter(Boolean);
+}
+
+export default async function SellerRegisterPage({ searchParams }: { searchParams: Promise<{ error?: string; details?: string }> }) {
+  const { error, details } = await searchParams;
+  const invalidDetails = error === "invalid" ? validationDetails(details) : undefined;
   const errorMessage =
     error === "blocked"
       ? "For your security, that registration request could not be verified. Open this page again and try once more."
@@ -16,9 +34,14 @@ export default async function SellerRegisterPage({ searchParams }: { searchParam
     <section className="mx-auto max-w-xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-black">Entrepreneur Registration</h1>
       {error && (
-        <p className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">
-          {errorMessage}
-        </p>
+        <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">
+          <p>{errorMessage}</p>
+          {invalidDetails && invalidDetails.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {invalidDetails.map((detail) => <li key={detail}>{detail}</li>)}
+            </ul>
+          )}
+        </div>
       )}
       <form action="/api/auth/register" method="post" className="mt-8 grid gap-5 rounded-lg border border-stone-200 bg-white p-5 shadow-soft">
         <label className="field"><span className="label">Full name</span><input className="input" name="fullName" required autoComplete="name" /></label>
@@ -26,7 +49,7 @@ export default async function SellerRegisterPage({ searchParams }: { searchParam
         <label className="field"><span className="label">Email address</span><input className="input" name="email" type="email" required autoComplete="email" /></label>
         <label className="field">
           <span className="label">Password</span>
-          <input className="input" name="password" type="password" required autoComplete="new-password" minLength={10} />
+          <input className="input" name="password" type="password" required autoComplete="new-password" minLength={10} maxLength={72} pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}" title="Use at least 10 characters with uppercase, lowercase, and a number." />
           <span className="text-sm text-stone-600">Use at least 10 characters with uppercase, lowercase, and a number.</span>
         </label>
         <button className="btn btn-primary" type="submit">Create Account</button>

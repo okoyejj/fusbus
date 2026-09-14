@@ -6,6 +6,16 @@ describe("seller registration validation", () => {
     expect(registerSchema.safeParse({ email: "seller@example.com", password: "Weak", fullName: "A", businessName: "" }).success).toBe(false);
     expect(registerSchema.safeParse({ email: "seller@example.com", password: "SellerPass123", fullName: "Valid Seller", businessName: "Valid Trade" }).success).toBe(true);
   });
+
+  it("trims registration identity fields before validating and saving", () => {
+    const result = registerSchema.safeParse({ email: " Seller@Example.com ", password: "SellerPass123", fullName: " Valid Seller ", businessName: " Valid Trade " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.email).toBe("Seller@Example.com");
+      expect(result.data.fullName).toBe("Valid Seller");
+      expect(result.data.businessName).toBe("Valid Trade");
+    }
+  });
 });
 
 describe("seller application validation", () => {
