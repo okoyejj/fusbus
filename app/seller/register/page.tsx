@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pruneFailedFormAttempts } from "@/lib/failed-form-attempts";
 
 const fieldLabels: Record<string, string> = {
   email: "Email address",
@@ -18,6 +19,7 @@ function validationDetails(details?: string) {
 }
 
 export default async function SellerRegisterPage({ searchParams }: { searchParams: Promise<{ error?: string; details?: string }> }) {
+  await pruneFailedFormAttempts().catch((error) => console.error("Failed to prune form attempts", error));
   const { error, details } = await searchParams;
   const invalidDetails = error === "invalid" ? validationDetails(details) : undefined;
   const errorMessage =

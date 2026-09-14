@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
 import { registerSchema } from "@/lib/validation";
 import { queueNotification } from "@/lib/notifications";
+import { logFailedFormAttempt } from "@/lib/failed-form-attempts";
 import { formError, formRedirect, publicOrigin, rateLimit, requireSameOrigin, wantsHtml } from "@/lib/security";
 
 export function GET(request: NextRequest) {
@@ -13,9 +14,15 @@ export function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const csrf = requireSameOrigin(request);
-  if (csrf) return formError(request, "/seller/register", "blocked", "For your security, that registration request could not be verified.", 403);
+  if (csrf) {
+    await logFailedFormAttempt({ request, formType: "seller-registration", errorCode: "blocked" });
+    return formError(request, "/seller/register", "blocked", "For your security, that registration request could not be verified.", 403);
+  }
   const limited = rateLimit(request, "register", 20, 60 * 60 * 1000);
-  if (limited) return formError(request, "/seller/register", "limited", "Too many registration attempts. Please wait and try again.", 429);
+  if (limited) {
+    await logFailedFormAttempt({ request, formType: "seller-registration", errorCode: "limited" });
+    return formError(request, "/seller/register", "limited", "Too many registration attempts. Please wait and try again.", 429);
+  }
   const body = Object.fromEntries((await request.formData()).entries());
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
@@ -23,11 +30,15 @@ export async function POST(request: NextRequest) {
       .map((issue) => `${issue.path.join(".")}:${issue.message}`)
       .slice(0, 4)
       .join("|");
+    await logFailedFormAttempt({ request, formType: "seller-registration", errorCode: "invalid", formData: body, errorDetails: parsed.error.flatten().fieldErrors });
     if (wantsHtml(request)) return formRedirect(request, "/seller/register", { error: "invalid", details });
     return NextResponse.json({ error: "Please check the registration form and try again.", details: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-  if (existing) return formError(request, "/seller/register", "exists", "An account already exists for that email address.", 409);
+  if (existing) {
+    await logFailedFormAttempt({ request, formType: "seller-registration", errorCode: "exists", formData: parsed.data });
+    return formError(request, "/seller/register", "exists", "An account already exists for that email address.", 409);
+  }
 
   const user = await prisma.user.create({
     data: {
