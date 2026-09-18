@@ -59,7 +59,11 @@ export function SellerMediaManager({ initialMedia }: { initialMedia: MediaItem[]
   const [uploadProgress, setUploadProgress] = useState(0);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
-  useEffect(() => setMedia(initialMedia), [initialMedia]);
+  const [previousMedia, setPreviousMedia] = useState(initialMedia);
+  if (previousMedia !== initialMedia) {
+    setPreviousMedia(initialMedia);
+    setMedia(initialMedia);
+  }
   useEffect(() => () => previewUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const galleryCount = useMemo(() => media.filter((item) => item.mediaType === "GALLERY").length, [media]);

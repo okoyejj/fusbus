@@ -3,7 +3,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
 import { registerSchema } from "@/lib/validation";
-import { queueNotification } from "@/lib/notifications";
+import { sendWelcomeEmail } from "@/lib/account-emails";
 import { formError, formRedirect, publicOrigin, rateLimit, requireSameOrigin } from "@/lib/security";
 
 export function GET(request: NextRequest) {
@@ -34,12 +34,11 @@ export async function POST(request: NextRequest) {
       }
     }
   });
-  queueNotification({
+  await sendWelcomeEmail({
     userId: user.id,
-    type: "SELLER_REGISTRATION",
-    subject: "Welcome to FusBus Cameroon",
-    message: "Your entrepreneur account has been created. Please complete your onboarding application."
-  }).catch(console.error);
+    email: user.email,
+    name: parsed.data.fullName
+  }).catch((error) => console.error("Unable to send registration email", error));
   await createSession(user.id);
   return NextResponse.redirect(new URL("/seller/application", publicOrigin(request)), 303);
 }

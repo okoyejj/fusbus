@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default async function SellerLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; notice?: string }> }) {
   const { error, notice } = await searchParams;
   const errorMessage =
@@ -40,6 +42,7 @@ export default async function SellerLoginPage({ searchParams }: { searchParams: 
         <label className="field"><span className="label">Password</span><input className="input" name="password" type="password" required autoComplete="current-password" /></label>
         <button className="btn btn-primary" type="submit">Log In</button>
       </form>
+      <p className="mt-4 text-sm text-stone-700"><Link className="font-bold text-forest" href="/seller/forgot-password">Forgot your password?</Link></p>
     </section>
   );
 }
