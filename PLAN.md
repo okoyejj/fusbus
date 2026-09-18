@@ -24,7 +24,7 @@
 4. **Blocked at execution:** added Playwright coverage for the user-visible forgot/reset flow; browser execution requires unavailable PostgreSQL plus sudo-only Chromium system libraries.
 5. **Completed except documented blockers:** formatting, lint, type checking, unit/integration tests, and build pass. E2E execution and a clean dependency audit are blocked as recorded below.
 6. **Blocked pending explicit protected-path approval:** update the ignored local `.env` SMTP secret; never commit or print it.
-7. **Active:** finalize `PLAN.md`, commit atomic changes, push the feature branch, and open a pull request if credentials permit.
+7. **Completed except PR tooling:** finalized `PLAN.md`, committed atomic changes, and pushed the feature branch. No GitHub CLI or authenticated PR connector is available, so the branch is ready for review via the manual PR URL below.
 
 ## Validation log
 
@@ -50,4 +50,5 @@
 - `5e3b80a feat: add secure password reset emails`
 - `f7fe21c test: cover password reset pages`
 - The pre-existing `next-env.d.ts` modification remains unstaged and excluded from all commits.
-- Push/PR status pending.
+- Pushed `feat/password-reset-emails` to `origin`; `main` was not modified or merged.
+- PR creation is unverified/unavailable because no GitHub CLI or authenticated connector is installed. Manual PR URL: https://github.com/okoyejj/fusbus/pull/new/feat/password-reset-emails
