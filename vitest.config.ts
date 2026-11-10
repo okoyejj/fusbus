@@ -14,7 +14,7 @@ export default defineConfig({
     exclude: ["node_modules", ".next", "e2e"],
     coverage: {
       provider: "v8",
-      include: ["lib/admin-status.ts", "lib/seller-application.ts", "lib/validation.ts", "lib/public-select.ts"],
+      include: ["lib/admin-status.ts", "lib/seller-application.ts", "lib/validation.ts", "lib/public-select.ts", "lib/pagination.ts"],
       reporter: ["text", "json-summary"],
       thresholds: {
         lines: 80,

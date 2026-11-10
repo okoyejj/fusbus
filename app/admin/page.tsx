@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ApplicationStatus, UserRole } from "@prisma/client";
+import { ApplicationStatus, Prisma, UserRole } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
+import { DEFAULT_PAGE_SIZE, paginationHref, paginationState, parsePage } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -17,7 +18,7 @@ const statusFilters = [
   [ApplicationStatus.ARCHIVED, "Archived"]
 ] as const;
 
-export default async function AdminDashboardPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string }> }) {
+export default async function AdminDashboardPage({ searchParams }: { searchParams: Promise<{ page?: string; status?: string; q?: string }> }) {
   try {
     await requireUser(UserRole.ADMIN);
   } catch {
@@ -27,15 +28,23 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const filters = await searchParams;
   const q = filters.q?.trim();
   const selectedStatus = Object.values(ApplicationStatus).includes(filters.status as ApplicationStatus) ? filters.status as ApplicationStatus : undefined;
+  const sellerWhere: Prisma.SellerProfileWhereInput = {
+    deletedAt: null,
+    ...(selectedStatus ? { applicationStatus: selectedStatus } : {}),
+    ...(q ? { OR: [{ businessName: { contains: q, mode: "insensitive" } }, { fullName: { contains: q, mode: "insensitive" } }, { sellerReferenceId: { contains: q, mode: "insensitive" } }] } : {})
+  };
+  const totalMatchingApplications = await prisma.sellerProfile.count({ where: sellerWhere });
+  const pagination = paginationState({
+    page: parsePage(filters.page),
+    totalItems: totalMatchingApplications,
+    pageSize: DEFAULT_PAGE_SIZE
+  });
   const sellers = await prisma.sellerProfile.findMany({
-    where: {
-      deletedAt: null,
-      ...(selectedStatus ? { applicationStatus: selectedStatus } : {}),
-      ...(q ? { OR: [{ businessName: { contains: q, mode: "insensitive" } }, { fullName: { contains: q, mode: "insensitive" } }, { sellerReferenceId: { contains: q, mode: "insensitive" } }] } : {})
-    },
+    where: sellerWhere,
     include: { user: { select: { email: true } } },
     orderBy: [{ applicationStatus: "asc" }, { updatedAt: "desc" }],
-    take: 50
+    take: pagination.pageSize,
+    skip: pagination.skip
   });
   const enquiries = await prisma.investorEnquiry.count({ where: { status: "NEW" } });
   const receipts = await prisma.investorTransactionReceipt.count();
@@ -48,6 +57,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const countFor = (status: ApplicationStatus) => statusCounts.find((item) => item.applicationStatus === status)?._count.applicationStatus ?? 0;
   const totalApplications = statusCounts.reduce((sum, item) => sum + item._count.applicationStatus, 0);
   const querySuffix = q ? `&q=${encodeURIComponent(q)}` : "";
+  const paginationParams = { q, status: selectedStatus };
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -134,6 +144,31 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
           </tbody>
         </table>
       </div>
+
+      {totalMatchingApplications > 0 && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4 text-sm">
+          <p className="font-semibold text-stone-600">
+            Showing {pagination.skip + 1}-{pagination.skip + sellers.length} of {totalMatchingApplications} applications
+          </p>
+          <div className="flex items-center gap-2">
+            <Link
+              aria-disabled={!pagination.hasPreviousPage}
+              className={`btn btn-secondary ${pagination.hasPreviousPage ? "" : "pointer-events-none opacity-50"}`}
+              href={paginationHref("/admin", paginationParams, pagination.page - 1)}
+            >
+              Previous
+            </Link>
+            <span className="px-2 font-bold text-ink">Page {pagination.page} of {pagination.totalPages}</span>
+            <Link
+              aria-disabled={!pagination.hasNextPage}
+              className={`btn btn-secondary ${pagination.hasNextPage ? "" : "pointer-events-none opacity-50"}`}
+              href={paginationHref("/admin", paginationParams, pagination.page + 1)}
+            >
+              Next
+            </Link>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

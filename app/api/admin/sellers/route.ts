@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { DEFAULT_PAGE_SIZE, paginationState, parsePage } from "@/lib/pagination";
 
 export async function GET(request: NextRequest) {
   await requireUser(UserRole.ADMIN);
@@ -14,6 +15,14 @@ export async function GET(request: NextRequest) {
     ...(params.get("location") ? { city: params.get("location")! } : {}),
     ...(q ? { OR: [{ businessName: { contains: q, mode: "insensitive" } }, { fullName: { contains: q, mode: "insensitive" } }, { sellerReferenceId: { contains: q, mode: "insensitive" } }] } : {})
   };
-  const sellers = await prisma.sellerProfile.findMany({ where, include: { user: { select: { email: true } }, media: true }, orderBy: { updatedAt: "desc" }, take: 50 });
-  return NextResponse.json({ sellers });
+  const total = await prisma.sellerProfile.count({ where });
+  const pagination = paginationState({ page: parsePage(params.get("page")), totalItems: total, pageSize: DEFAULT_PAGE_SIZE });
+  const sellers = await prisma.sellerProfile.findMany({
+    where,
+    include: { user: { select: { email: true } }, media: true },
+    orderBy: { updatedAt: "desc" },
+    take: pagination.pageSize,
+    skip: pagination.skip
+  });
+  return NextResponse.json({ sellers, pagination });
 }

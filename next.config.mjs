@@ -20,6 +20,15 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig = {
   output: "standalone",
+  async redirects() {
+    return [
+      {
+        source: "/webmail",
+        destination: "https://sxb1plzcpnl433766.prod.sxb1.secureserver.net:2096/",
+        permanent: false
+      }
+    ];
+  },
   experimental: {
     serverActions: { bodySizeLimit: "8mb" }
   },
