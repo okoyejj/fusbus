@@ -21,7 +21,7 @@ export default async function SellersPage({ searchParams }: { searchParams: Prom
     ...(q ? { OR: [{ businessName: { contains: q, mode: "insensitive" } }, { fullName: { contains: q, mode: "insensitive" } }, { sellerReferenceId: { contains: q, mode: "insensitive" } }, { productsOrServices: { contains: q, mode: "insensitive" } }] } : {})
   };
   const total = await prisma.sellerProfile.count({ where });
-  const pagination = paginationState({ page: parsePage(filters.page), totalItems: total, pageSize: 9 });
+  const pagination = paginationState({ page: parsePage(filters.page), totalItems: total, pageSize: 12 });
   const paginationParams = { q, category: filters.category, location: filters.location, stage: filters.stage, support: filters.support };
   const sellers = await prisma.sellerProfile.findMany({
     where,
