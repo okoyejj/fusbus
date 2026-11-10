@@ -53,6 +53,7 @@ function formRequest(path: string, values: Record<string, string>, ip: string) {
 describe("account email routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("APP_URL", "http://localhost");
     process.env.SESSION_SECRET = "a-secure-test-secret-that-is-longer-than-32-characters";
     mocks.createSession.mockResolvedValue(undefined);
     mocks.hashPassword.mockResolvedValue("new-password-hash");

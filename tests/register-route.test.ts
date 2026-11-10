@@ -20,13 +20,14 @@ vi.mock("@/lib/prisma", () => ({
   }
 }));
 vi.mock("@/lib/auth", () => ({ createSession: mocks.createSession, hashPassword: mocks.hashPassword, clientIp: () => "test" }));
+vi.mock("@/lib/account-emails", () => ({ sendWelcomeEmail: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/notifications", () => ({ queueNotification: mocks.queueNotification }));
 vi.mock("@/lib/action-tokens", () => ({ createActionToken: () => "verify-token" }));
 
 function request(values: Record<string, string>, accept = "text/html") {
   const body = new FormData();
   Object.entries(values).forEach(([key, value]) => body.set(key, value));
-  return new NextRequest("http://localhost/api/auth/register", { method: "POST", body, headers: { origin: "http://localhost", referer: "http://localhost/seller/register", accept } });
+  return new NextRequest("http://localhost/api/auth/register", { method: "POST", body, headers: { host: "localhost", origin: "http://localhost", referer: "http://localhost/seller/register", accept } });
 }
 
 beforeEach(() => {
