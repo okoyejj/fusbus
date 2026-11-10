@@ -14,10 +14,8 @@ export function forbidden(message = "Forbidden") {
 }
 
 export function publicOrigin(request: NextRequest) {
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
-  if (forwardedHost) return `${forwardedProto.split(",")[0]}://${forwardedHost.split(",")[0]}`;
-  return request.nextUrl.origin;
+  // APP_URL is server-controlled; forwarded headers are not an origin allowlist.
+  return process.env.APP_URL ? new URL(process.env.APP_URL).origin : request.nextUrl.origin;
 }
 
 export function wantsHtml(request: NextRequest) {
@@ -47,7 +45,7 @@ export function requireSameOrigin(request: NextRequest) {
   const method = request.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
 
-  const requestOrigins = new Set([request.nextUrl.origin, publicOrigin(request)]);
+  const requestOrigins = new Set([publicOrigin(request)]);
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
   const fetchSite = request.headers.get("sec-fetch-site");
@@ -68,6 +66,9 @@ export function requireSameOrigin(request: NextRequest) {
 export function rateLimit(request: NextRequest, key: string, limit: number, windowMs: number) {
   const now = Date.now();
   const id = `${clientIp(request)}:${key}`;
+  for (const [key, record] of rateStore) {
+    if (record.resetAt <= now) rateStore.delete(key);
+  }
   const current = rateStore.get(id);
 
   if (!current || current.resetAt <= now) {
@@ -93,5 +94,5 @@ export function resolveInside(root: string, ...segments: string[]) {
 }
 
 export function privateStorageRoot() {
-  return path.resolve(process.env.PRIVATE_UPLOAD_DIR ?? "./storage/private");
+  return path.resolve(/* turbopackIgnore: true */ process.env.PRIVATE_UPLOAD_DIR ?? "./storage/private");
 }

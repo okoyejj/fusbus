@@ -6,6 +6,7 @@ import { businessCategories, businessStages } from "@/lib/validation";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import { SellerMediaManager } from "@/components/SellerMediaManager";
 import { SellerApplicationForm } from "@/components/SellerApplicationForm";
+import { socialLinksFormValue } from "@/lib/seller-application";
 import { CountedTextarea } from "@/components/CountedTextarea";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ const fieldLabels: Record<string, string> = {
   consentPublish: "Consent to publish approved profile information"
 };
 
-const requiredForSubmit = new Set(["city", "region", "category", "productsOrServices", "businessStage", "supportNeeded"]);
+const requiredForSubmit = new Set(["fullName", "businessName", "city", "region", "category", "productsOrServices", "businessStage", "supportNeeded"]);
 
 function labelText(name: string, label: string) {
   return requiredForSubmit.has(name) ? `${label} *` : label;
@@ -103,14 +104,14 @@ export default async function SellerApplicationPage({ searchParams }: { searchPa
             </select>
             {invalidFields.includes("businessStage") && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
           </label>
-          <label className="field"><span className="label">Years in business</span><input className="input" name="yearsInBusiness" type="number" min="0" defaultValue={value(profile.yearsInBusiness)} /></label>
-          <label className="field"><span className="label">Number of employees</span><input className="input" name="employeeCount" type="number" min="0" defaultValue={value(profile.employeeCount)} /></label>
-          <label className="field"><span className="label">Funding amount sought</span><input className="input" name="fundingAmount" type="number" min="0" defaultValue={value(profile.fundingAmount)} /></label>
+          <label className="field"><span className="label">Years in business</span><input className="input" name="yearsInBusiness" type="number" min="0" max="100" defaultValue={value(profile.yearsInBusiness)} /></label>
+          <label className="field"><span className="label">Number of employees</span><input className="input" name="employeeCount" type="number" min="0" max="100000" defaultValue={value(profile.employeeCount)} /></label>
+          <label className="field"><span className="label">Funding amount sought</span><input className="input" name="fundingAmount" type="number" min="0" max="9999999999.99" step="0.01" defaultValue={value(profile.fundingAmount)} /></label>
         </div>
         {longFields.map(([name, label, maxLength]) => (
           <label className="field" key={name}>
             <span className="label">{labelText(name, label)}</span>
-            <CountedTextarea name={name} defaultValue={value(name === "socialLinks" && profile.socialLinks ? JSON.stringify(profile.socialLinks) : profile[name])} maxLength={maxLength} required={requiredForSubmit.has(name)} />
+            <CountedTextarea name={name} defaultValue={value(name === "socialLinks" ? socialLinksFormValue(profile.socialLinks) : profile[name])} maxLength={maxLength} required={requiredForSubmit.has(name)} />
             {invalidFields.includes(name) && <span className="text-sm font-semibold text-red-700">Check this field before submitting for review.</span>}
           </label>
         ))}

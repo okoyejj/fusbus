@@ -18,8 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteHeader />
         <main id="main">{children}</main>
         <footer className="border-t border-stone-200 bg-white">
-          <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 text-sm text-stone-700 sm:grid-cols-3 sm:px-6 lg:px-8">
+          <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 text-sm text-stone-700 sm:grid-cols-4 sm:px-6 lg:px-8">
             <p>Opening Cameroon to the world through verified entrepreneur visibility.</p>
+            <Link href="/banking" className="font-semibold text-forest">Support Us</Link>
             <Link href="/privacy" className="font-semibold text-forest">Privacy Policy</Link>
             <Link href="/terms" className="font-semibold text-forest">Terms and Conditions</Link>
           </div>

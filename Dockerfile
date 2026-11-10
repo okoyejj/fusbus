@@ -5,6 +5,8 @@ RUN npm ci
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+ARG NEXT_BUILD_CPUS=2
+ENV CIRCLE_NODE_TOTAL=$NEXT_BUILD_CPUS
 RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

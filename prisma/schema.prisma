@@ -239,3 +239,20 @@ model Notification {
 
   user User? @relation(fields: [userId], references: [id])
 }
+
+model FailedFormAttempt {
+  id           String   @id @default(cuid())
+  formType     String
+  email        String?
+  fullName     String?
+  businessName String?
+  errorCode    String
+  errorDetails Json?
+  origin       String?
+  referer      String?
+  host         String?
+  createdAt    DateTime @default(now())
+
+  @@index([formType, createdAt])
+  @@index([email])
+}

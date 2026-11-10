@@ -1,3 +1,4 @@
+import { verifyActionToken } from "@/lib/action-tokens";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { formError, formRedirect, requireSameOrigin } from "@/lib/security";
@@ -12,8 +13,8 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "").toLowerCase();
   const token = String(form.get("token") ?? "");
-  const expectedToken = process.env.EMAIL_VERIFICATION_TOKEN;
-  if (!email || !expectedToken || token !== expectedToken) return formError(request, "/seller/login", "verify-invalid", "That verification link is invalid or expired.");
-  await prisma.user.updateMany({ where: { email }, data: { emailVerified: true } });
+  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  if (!email || !user || !user.isActive || user.deletedAt || user.emailVerified || !verifyActionToken(token, user, "verify-email")) return formError(request, "/seller/login", "verify-invalid", "That verification link is invalid or expired.");
+  await prisma.user.updateMany({ where: { id: user.id, emailVerified: false }, data: { emailVerified: true } });
   return formRedirect(request, "/seller/login", { notice: "email-verified" });
 }

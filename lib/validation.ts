@@ -3,7 +3,7 @@ import { z } from "zod";
 const blankToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
 const optionalText = (max: number) => z.preprocess(blankToNull, z.string().trim().max(max, `Use ${max} characters or fewer.`).nullable().optional());
 const optionalNumber = (max: number) => z.preprocess(blankToNull, z.coerce.number().int().min(0).max(max).nullable().optional());
-const optionalMoney = z.preprocess(blankToNull, z.coerce.number().nonnegative().nullable().optional());
+const optionalMoney = z.preprocess(blankToNull, z.coerce.number().finite().nonnegative().max(9999999999.99, "Funding must be 9,999,999,999.99 or less.").multipleOf(0.01, "Use at most two decimal places.").nullable().optional());
 const optionalUrl = z.preprocess(blankToNull, z.string().trim().max(500, "Use 500 characters or fewer.").url("Enter a complete URL, including https://").nullable().optional());
 
 export const businessStages = [
@@ -42,13 +42,14 @@ export const passwordSchema = z
   .min(10)
   .regex(/[A-Z]/, "Add an uppercase letter")
   .regex(/[a-z]/, "Add a lowercase letter")
-  .regex(/[0-9]/, "Add a number");
+  .regex(/[0-9]/, "Add a number")
+  .refine((value) => new TextEncoder().encode(value).length <= 72, "Use a password of at most 72 UTF-8 bytes.");
 
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   password: passwordSchema,
-  fullName: z.string().min(2).max(120),
-  businessName: z.string().min(2).max(140)
+  fullName: z.string().trim().min(2).max(120),
+  businessName: z.string().trim().min(2).max(140)
 });
 
 export const loginSchema = z.object({
@@ -79,8 +80,8 @@ export const sellerProfileSchema = z.object({
   supportNeeded: optionalText(500),
   fundingAmount: optionalMoney,
   useOfFunds: optionalText(2000),
-  consentReview: z.coerce.boolean(),
-  consentPublish: z.coerce.boolean()
+  consentReview: z.boolean(),
+  consentPublish: z.boolean()
 });
 
 export const submitSellerSchema = sellerProfileSchema.extend({

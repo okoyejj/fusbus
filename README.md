@@ -57,3 +57,15 @@ Standard shared GoDaddy hosting is generally not suitable for this full server-r
 ## Operations
 
 Back up PostgreSQL daily with point-in-time recovery where available. Store uploaded media in versioned object storage. Maintain a data access/correction/export/deletion workflow through admin operations and audit logs.
+
+## Application and image recovery
+
+Use **Save Draft** to store an incomplete application in your account. Sign in later and reopen the application to finish it. Failed saves keep entries on screen; after a session expires, sign in in another tab and retry saving.
+
+Seller images are converted to WebP under `PRIVATE_UPLOAD_DIR/seller-images` (default `storage/private/seller-images`) and served by `/api/media/:id`. Keep this directory persistent and writable by the app. Owners and admins can view private images; public access requires approved status, publication consent, and public media. Legacy files remain readable from `UPLOAD_DIR` through the same endpoint. Image responses bypass optimization and public caching so access checks run for every request.
+
+**Legacy deployment prerequisite:** remove the direct `/uploads/*` file-server handler from `deploy/Caddyfile`, forwarding requests to the app instead. The application blocks direct legacy URLs. Until that protected configuration change is approved and deployed, the old Caddy handler bypasses application privacy checks. Previously cached public responses cannot be recalled; clear managed proxy/CDN caches during rollout.
+
+Set `APP_URL` to the exact browser-facing origin for request validation. Shared reset and verification environment tokens are no longer accepted. Account-specific tokens expire after 30 minutes and are queued in notifications; configure a secure notification email worker for delivery. Password-reset tokens stop working once the password changes.
+
+Quality checks: `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run test:e2e`. Browser tests require a running test PostgreSQL database.

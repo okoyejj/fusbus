@@ -6,6 +6,16 @@ describe("seller registration validation", () => {
     expect(registerSchema.safeParse({ email: "seller@example.com", password: "Weak", fullName: "A", businessName: "" }).success).toBe(false);
     expect(registerSchema.safeParse({ email: "seller@example.com", password: "SellerPass123", fullName: "Valid Seller", businessName: "Valid Trade" }).success).toBe(true);
   });
+
+  it("trims registration identity fields before validating and saving", () => {
+    const result = registerSchema.safeParse({ email: " Seller@Example.com ", password: "SellerPass123", fullName: " Valid Seller ", businessName: " Valid Trade " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.email).toBe("Seller@Example.com");
+      expect(result.data.fullName).toBe("Valid Seller");
+      expect(result.data.businessName).toBe("Valid Trade");
+    }
+  });
 });
 
 describe("seller application validation", () => {
@@ -70,5 +80,17 @@ describe("file upload validation helpers", () => {
     expect(sanitizeFileName("../../bad file.exe")).toBe("bad-file.exe");
     expect(allowedImageTypes).toContain("image/webp");
     expect(allowedImageTypes.includes("application/x-msdownload" as never)).toBe(false);
+  });
+});
+
+describe("database-compatible funding and explicit consent", () => {
+  it.each(["0", "12.34", "9999999999.99", ""])("accepts valid funding %s", (fundingAmount) => {
+    expect(sellerProfileSchema.partial().safeParse({ fundingAmount }).success).toBe(true);
+  });
+  it.each(["10000000000", "1.001", "Infinity", "-1"])("rejects invalid funding %s", (fundingAmount) => {
+    expect(sellerProfileSchema.partial().safeParse({ fundingAmount }).success).toBe(false);
+  });
+  it("does not interpret a false string as consent", () => {
+    expect(sellerProfileSchema.partial().safeParse({ consentPublish: "false" }).success).toBe(false);
   });
 });

@@ -82,7 +82,7 @@ export function HeroCarousel() {
             type="button"
             className={`h-3 rounded-full transition-all ${index === active ? "w-10 bg-gold" : "w-3 bg-white/65 hover:bg-white"}`}
             aria-label={`Show slide ${index + 1}: ${slide.title}`}
-            aria-selected={index === active}
+            aria-pressed={index === active}
             onClick={() => setActive(index)}
           />
         ))}
